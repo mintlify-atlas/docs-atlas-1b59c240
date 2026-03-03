@@ -1,0 +1,601 @@
+---
+title: Permission
+description: Enum representing Discord's permission system with bit offsets for server and channel-level access control
+---
+
+# Permission
+
+Represents the bit offsets used by Discord for permissions. Permissions control what actions users and roles can perform in guilds and channels.
+
+## Permission Constants
+
+### General Server / Channel Permissions
+
+#### MANAGE_CHANNEL
+Allows management and editing of channels.
+- **Offset**: 4
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Manage Channels"
+
+#### MANAGE_SERVER
+Allows management and editing of the server.
+- **Offset**: 5
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Manage Server"
+
+#### VIEW_AUDIT_LOGS
+Allows viewing of audit logs.
+- **Offset**: 7
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "View Audit Log"
+
+#### VIEW_CHANNEL
+Allows viewing of channels.
+- **Offset**: 10
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "View Channels"
+
+#### VIEW_GUILD_INSIGHTS
+Allows viewing of server insights.
+- **Offset**: 19
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "View Server Insights"
+
+#### MANAGE_ROLES
+Allows management of roles at the server level.
+- **Offset**: 28
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Manage Roles"
+
+#### MANAGE_PERMISSIONS
+Allows management of permissions at the channel level.
+- **Offset**: 28
+- **Guild**: No
+- **Channel**: Yes
+- **Name**: "Manage Permissions"
+
+#### MANAGE_WEBHOOKS
+Allows management of webhooks.
+- **Offset**: 29
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Manage Webhooks"
+
+#### MANAGE_GUILD_EXPRESSIONS
+Allows management of emojis, stickers, and soundboard sounds.
+- **Offset**: 30
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Manage Expressions"
+
+#### MANAGE_EVENTS
+Allows management of scheduled events.
+- **Offset**: 33
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Manage Events"
+
+#### USE_EMBEDDED_ACTIVITIES
+Allows use of Activities (applications with the EMBEDDED flag) in voice channels.
+- **Offset**: 39
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Use Activities"
+
+#### VIEW_CREATOR_MONETIZATION_ANALYTICS
+Allows viewing creator monetization analytics.
+- **Offset**: 41
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "View Creator Analytics"
+
+#### CREATE_GUILD_EXPRESSIONS
+Allows creating emojis, stickers, and soundboard sounds.
+- **Offset**: 43
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Create Expressions"
+
+#### CREATE_SCHEDULED_EVENTS
+Allows creating scheduled events.
+- **Offset**: 44
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Create Events"
+
+### Membership Permissions
+
+#### CREATE_INSTANT_INVITE
+Allows creation of instant invites.
+- **Offset**: 0
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Create Instant Invite"
+
+#### KICK_MEMBERS
+Allows kicking members.
+- **Offset**: 1
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Kick Members"
+
+#### BAN_MEMBERS
+Allows banning members.
+- **Offset**: 2
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Ban Members"
+
+#### NICKNAME_CHANGE
+Allows changing own nickname.
+- **Offset**: 26
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Change Nickname"
+
+#### NICKNAME_MANAGE
+Allows managing other members' nicknames.
+- **Offset**: 27
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Manage Nicknames"
+
+#### MODERATE_MEMBERS
+Allows timing out members.
+- **Offset**: 40
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Timeout Members"
+
+### Text Permissions
+
+#### MESSAGE_ADD_REACTION
+Allows adding reactions to messages.
+- **Offset**: 6
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Add Reactions"
+
+#### MESSAGE_SEND
+Allows sending messages in channels.
+- **Offset**: 11
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Send Messages"
+
+#### MESSAGE_TTS
+Allows sending Text-to-Speech messages.
+- **Offset**: 12
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Send TTS Messages"
+
+#### MESSAGE_MANAGE
+Allows deleting and pinning messages.
+- **Offset**: 13
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Manage Messages"
+
+#### MESSAGE_EMBED_LINKS
+Allows links to be embedded.
+- **Offset**: 14
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Embed Links"
+
+#### MESSAGE_ATTACH_FILES
+Allows uploading files and media.
+- **Offset**: 15
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Attach Files"
+
+#### MESSAGE_HISTORY
+Allows reading message history.
+- **Offset**: 16
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Read History"
+
+#### MESSAGE_MENTION_EVERYONE
+Allows using @everyone and @here.
+- **Offset**: 17
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Mention Everyone"
+
+#### MESSAGE_EXT_EMOJI
+Allows using external emojis.
+- **Offset**: 18
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Use External Emojis"
+
+#### USE_APPLICATION_COMMANDS
+Allows using slash commands.
+- **Offset**: 31
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Use Application Commands"
+
+#### MESSAGE_EXT_STICKER
+Allows using external stickers.
+- **Offset**: 37
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Use External Stickers"
+
+#### MESSAGE_ATTACH_VOICE_MESSAGE
+Allows sending voice messages.
+- **Offset**: 46
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Send Voice Messages"
+
+#### MESSAGE_SEND_POLLS
+Allows creating polls.
+- **Offset**: 49
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Create Polls"
+
+#### USE_EXTERNAL_APPLICATIONS
+Allows using external applications.
+- **Offset**: 50
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Use External Apps"
+
+#### PIN_MESSAGES
+Allows pinning messages.
+- **Offset**: 51
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Pin Messages"
+
+#### BYPASS_SLOWMODE
+Allows bypassing slowmode.
+- **Offset**: 52
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Bypass Slowmode"
+
+### Thread Permissions
+
+#### MANAGE_THREADS
+Allows managing threads.
+- **Offset**: 34
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Manage Threads"
+
+#### CREATE_PUBLIC_THREADS
+Allows creating public threads.
+- **Offset**: 35
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Create Public Threads"
+
+#### CREATE_PRIVATE_THREADS
+Allows creating private threads.
+- **Offset**: 36
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Create Private Threads"
+
+#### MESSAGE_SEND_IN_THREADS
+Allows sending messages in threads.
+- **Offset**: 38
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Send Messages in Threads"
+
+### Voice Permissions
+
+#### PRIORITY_SPEAKER
+Allows priority speaker in voice channels.
+- **Offset**: 8
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Priority Speaker"
+
+#### VOICE_STREAM
+Allows streaming video in voice channels.
+- **Offset**: 9
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Video"
+
+#### VOICE_CONNECT
+Allows connecting to voice channels.
+- **Offset**: 20
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Connect"
+
+#### VOICE_SPEAK
+Allows speaking in voice channels.
+- **Offset**: 21
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Speak"
+
+#### VOICE_MUTE_OTHERS
+Allows muting members in voice channels.
+- **Offset**: 22
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Mute Members"
+
+#### VOICE_DEAF_OTHERS
+Allows deafening members in voice channels.
+- **Offset**: 23
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Deafen Members"
+
+#### VOICE_MOVE_OTHERS
+Allows moving members between voice channels.
+- **Offset**: 24
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Move Members"
+
+#### VOICE_USE_VAD
+Allows using voice activity detection.
+- **Offset**: 25
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Use Voice Activity"
+
+#### VOICE_USE_SOUNDBOARD
+Allows using the soundboard.
+- **Offset**: 42
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Use Soundboard"
+
+#### VOICE_USE_EXTERNAL_SOUNDS
+Allows using external soundboard sounds.
+- **Offset**: 45
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Use External Sounds"
+
+#### VOICE_SET_STATUS
+Allows setting voice channel status.
+- **Offset**: 48
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Set Voice Channel Status"
+
+### Stage Channel Permissions
+
+#### REQUEST_TO_SPEAK
+Allows requesting to speak in stage channels.
+- **Offset**: 32
+- **Guild**: Yes
+- **Channel**: Yes
+- **Name**: "Request to Speak"
+
+### Advanced Permissions
+
+#### ADMINISTRATOR
+Grants all permissions and bypasses channel permission overwrites.
+- **Offset**: 3
+- **Guild**: Yes
+- **Channel**: No
+- **Name**: "Administrator"
+
+#### UNKNOWN
+Represents an unknown permission.
+- **Offset**: -1
+- **Guild**: No
+- **Channel**: No
+- **Name**: "Unknown"
+
+## Methods
+
+### getName()
+
+Returns the readable name as shown in the Discord client.
+
+**Returns:** The readable permission name
+
+```java
+String name = Permission.MESSAGE_SEND.getName(); // "Send Messages"
+```
+
+### getOffset()
+
+Returns the binary offset of the permission.
+
+**Returns:** The bit offset
+
+```java
+int offset = Permission.ADMINISTRATOR.getOffset(); // 3
+```
+
+### getRawValue()
+
+Returns the raw bitmask value of this permission.
+
+**Returns:** The raw value (equivalent to `1 << getOffset()`)
+
+```java
+long raw = Permission.MESSAGE_SEND.getRawValue();
+```
+
+### isGuild()
+
+Checks if this permission is present at the guild level (configurable via Roles).
+
+**Returns:** `true` if present at guild level
+
+```java
+if (Permission.KICK_MEMBERS.isGuild()) {
+    // This is a guild-level permission
+}
+```
+
+### isChannel()
+
+Checks if this permission is present at the channel level (configurable via PermissionOverrides).
+
+**Returns:** `true` if present at channel level
+
+```java
+if (Permission.MESSAGE_SEND.isChannel()) {
+    // Can be overridden per channel
+}
+```
+
+## Static Methods
+
+### getFromOffset(int offset)
+
+Gets the Permission matching the provided offset.
+
+**Parameters:**
+- `offset` - The bit offset
+
+**Returns:** The matching Permission, or `UNKNOWN` if not found
+
+```java
+Permission perm = Permission.getFromOffset(11); // MESSAGE_SEND
+```
+
+### getPermissions(long permissions)
+
+Converts a raw permission bitmask into an EnumSet of Permissions.
+
+**Parameters:**
+- `permissions` - The raw long representation
+
+**Returns:** EnumSet of Permissions
+
+```java
+long rolePerms = role.getPermissionsRaw();
+EnumSet<Permission> perms = Permission.getPermissions(rolePerms);
+```
+
+### getRaw(Permission... permissions)
+
+Converts one or more Permissions into a raw bitmask.
+
+**Parameters:**
+- `permissions` - The permissions to convert
+
+**Returns:** The raw long representation
+
+```java
+long raw = Permission.getRaw(
+    Permission.MESSAGE_SEND,
+    Permission.MESSAGE_EMBED_LINKS,
+    Permission.MESSAGE_ATTACH_FILES
+);
+```
+
+### getRaw(Collection\<Permission\> permissions)
+
+Converts a collection of Permissions into a raw bitmask.
+
+**Parameters:**
+- `permissions` - The permission collection
+
+**Returns:** The raw long representation
+
+```java
+EnumSet<Permission> perms = EnumSet.of(
+    Permission.VIEW_CHANNEL,
+    Permission.MESSAGE_SEND
+);
+long raw = Permission.getRaw(perms);
+```
+
+## Constants
+
+### EMPTY_PERMISSIONS
+
+Empty array of Permission enum for optimized use in `Collection.toArray()`.
+
+```java
+Permission[] array = permissionList.toArray(Permission.EMPTY_PERMISSIONS);
+```
+
+## Usage Examples
+
+### Checking Member Permissions
+
+```java
+public void checkPermissions(Member member, GuildChannel channel) {
+    if (member.hasPermission(Permission.ADMINISTRATOR)) {
+        System.out.println("User is an administrator");
+    }
+    
+    if (member.hasPermission(channel, Permission.MESSAGE_SEND)) {
+        System.out.println("User can send messages in this channel");
+    }
+}
+```
+
+### Creating a Role with Permissions
+
+```java
+public void createModeratorRole(Guild guild) {
+    guild.createRole()
+        .setName("Moderator")
+        .setPermissions(
+            Permission.KICK_MEMBERS,
+            Permission.BAN_MEMBERS,
+            Permission.MESSAGE_MANAGE,
+            Permission.MANAGE_THREADS
+        )
+        .queue();
+}
+```
+
+### Working with Permission Overwrites
+
+```java
+public void restrictChannel(TextChannel channel, Role role) {
+    channel.upsertPermissionOverride(role)
+        .deny(
+            Permission.MESSAGE_SEND,
+            Permission.MESSAGE_ADD_REACTION
+        )
+        .allow(
+            Permission.VIEW_CHANNEL,
+            Permission.MESSAGE_HISTORY
+        )
+        .queue();
+}
+```
+
+### Converting Raw Permissions
+
+```java
+public void analyzePermissions(Role role) {
+    long rawPerms = role.getPermissionsRaw();
+    EnumSet<Permission> permissions = Permission.getPermissions(rawPerms);
+    
+    System.out.println("Role has " + permissions.size() + " permissions:");
+    for (Permission perm : permissions) {
+        System.out.println("- " + perm.getName());
+    }
+}
+```
+
+## See Also
+
+- [PermissionOverride](../entities/permission-override)
+- [Role](../entities/role)
+- [Member](../entities/member)
+- [Discord Permissions Documentation](https://discord.com/developers/docs/topics/permissions)

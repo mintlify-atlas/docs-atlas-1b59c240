@@ -1,0 +1,383 @@
+---
+title: Role
+description: API reference for the Role entity in JDA
+---
+
+Represents a Guild's Role. Used to control permissions for Members.
+
+## Overview
+
+Roles are used to organize members and assign permissions in a guild. Each role has a position, color, and set of permissions.
+
+## Key Properties
+
+### Basic Information
+
+<ResponseField name="getId()" type="String">
+  The Snowflake id of this Role.
+  
+  ```java
+  String roleId = role.getId();
+  ```
+</ResponseField>
+
+<ResponseField name="getIdLong()" type="long">
+  The Snowflake id of this Role as a primitive long.
+  
+  ```java
+  long roleId = role.getIdLong();
+  ```
+</ResponseField>
+
+<ResponseField name="getName()" type="String">
+  The name of this Role.
+  
+  ```java
+  String name = role.getName();
+  ```
+</ResponseField>
+
+<ResponseField name="getGuild()" type="Guild">
+  Returns the Guild this Role exists in.
+  
+  ```java
+  Guild guild = role.getGuild();
+  ```
+</ResponseField>
+
+### Position and Hierarchy
+
+<ResponseField name="getPosition()" type="int">
+  The hierarchical position of this Role in the Guild hierarchy (higher value means higher role).
+  
+  The @everyone role always returns -1.
+  
+  ```java
+  int position = role.getPosition();
+  ```
+</ResponseField>
+
+<ResponseField name="getPositionRaw()" type="int">
+  The actual position of the Role as stored by Discord.
+  
+  ```java
+  int rawPosition = role.getPositionRaw();
+  ```
+</ResponseField>
+
+<ResponseField name="canInteract(Role role)" type="boolean">
+  Whether this Role can interact with the specified Role (move/manage/etc.).
+  
+  ```java
+  if (moderatorRole.canInteract(memberRole)) {
+      // Can manage this role
+  }
+  ```
+</ResponseField>
+
+### Permissions
+
+<ResponseField name="getPermissions()" type="EnumSet<Permission>">
+  Gets the Permissions that this Role has.
+  
+  ```java
+  EnumSet<Permission> permissions = role.getPermissions();
+  if (permissions.contains(Permission.ADMINISTRATOR)) {
+      System.out.println("Admin role");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getPermissionsRaw()" type="long">
+  The long representation of the literal permissions that this Role has.
+  
+  ```java
+  long permissions = role.getPermissionsRaw();
+  ```
+</ResponseField>
+
+<ResponseField name="hasPermission(Permission... permissions)" type="boolean">
+  Checks whether this role has the specified permissions.
+  
+  ```java
+  if (role.hasPermission(Permission.KICK_MEMBERS)) {
+      System.out.println("Can kick members");
+  }
+  ```
+</ResponseField>
+
+### Appearance
+
+<ResponseField name="getColors()" type="RoleColors">
+  The colors this Role is displayed in.
+  
+  ```java
+  RoleColors colors = role.getColors();
+  Color primary = colors.getPrimary();
+  ```
+</ResponseField>
+
+<ResponseField name="getColor()" type="Color">
+  The color this Role is displayed in.
+  
+  Returns `null` if the role uses the default color.
+  
+  ```java
+  Color color = role.getColor();
+  if (color != null) {
+      System.out.println("RGB: " + color.getRGB());
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getColorRaw()" type="int">
+  The raw color RGB value used for this role.
+  
+  Defaults to `Role.DEFAULT_COLOR_RAW` if this role has no set color.
+  
+  ```java
+  int colorRaw = role.getColorRaw();
+  ```
+</ResponseField>
+
+<ResponseField name="getIcon()" type="RoleIcon">
+  The Icon of this role.
+  
+  Returns `null` if no custom image or emoji is set.
+  
+  ```java
+  RoleIcon icon = role.getIcon();
+  if (icon != null) {
+      String iconUrl = icon.getIconUrl();
+  }
+  ```
+</ResponseField>
+
+### Display Settings
+
+<ResponseField name="isHoisted()" type="boolean">
+  Whether this Role is hoisted. Members in a hoisted role are displayed in their own grouping on the user-list.
+  
+  ```java
+  if (role.isHoisted()) {
+      System.out.println("Displayed separately");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isMentionable()" type="boolean">
+  Whether this role is mentionable.
+  
+  ```java
+  if (role.isMentionable()) {
+      channel.sendMessage(role.getAsMention()).queue();
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getAsMention()" type="String">
+  Returns a mention tag for this role.
+  
+  ```java
+  String mention = role.getAsMention(); // Returns: <@&roleId>
+  ```
+</ResponseField>
+
+### Special Roles
+
+<ResponseField name="isPublicRole()" type="boolean">
+  Whether this role is the @everyone role for its Guild, which is assigned to everyone who joins the Guild.
+  
+  ```java
+  if (role.isPublicRole()) {
+      System.out.println("This is the @everyone role");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isManaged()" type="boolean">
+  Whether this Role is managed by an integration.
+  
+  ```java
+  if (role.isManaged()) {
+      System.out.println("Cannot be manually assigned");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getTags()" type="RoleTags">
+  The tags of this role. Useful to determine the purpose of a managed role.
+  
+  Requires the `ROLE_TAGS` cache flag to be enabled.
+  
+  ```java
+  RoleTags tags = role.getTags();
+  if (tags.isBot()) {
+      long botId = tags.getBotIdLong();
+  }
+  if (tags.isBoost()) {
+      System.out.println("Server boost role");
+  }
+  ```
+</ResponseField>
+
+## Role Actions
+
+### Management
+
+<ParamField path="getManager()" type="RoleManager">
+  The RoleManager for this Role. Used to modify role settings.
+  
+  ```java
+  role.getManager()
+      .setName("Updated Name")
+      .setColor(Color.BLUE)
+      .setPermissions(Permission.MESSAGE_SEND)
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="delete()" type="AuditableRestAction<Void>">
+  Deletes this Role.
+  
+  ```java
+  role.delete()
+      .reason("No longer needed")
+      .queue();
+  ```
+</ParamField>
+
+### Creating Roles
+
+<ParamField path="createCopy()" type="RoleAction">
+  Creates a new Role in this Guild with the same settings as this role.
+  
+  It will be placed at the bottom to avoid permission hierarchy conflicts.
+  
+  ```java
+  role.createCopy()
+      .setName("Copy of " + role.getName())
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="createCopy(Guild guild)" type="RoleAction">
+  Creates a new Role in the specified Guild with the same settings as this role.
+  
+  ```java
+  role.createCopy(targetGuild)
+      .queue();
+  ```
+</ParamField>
+
+## Role Tags
+
+The RoleTags interface provides information about managed roles:
+
+<ResponseField name="isBot()" type="boolean">
+  Whether this role is associated with a bot.
+</ResponseField>
+
+<ResponseField name="getBotIdLong()" type="long">
+  The id for the bot associated with this role.
+  
+  Returns 0 if this role is not for a bot.
+</ResponseField>
+
+<ResponseField name="isBoost()" type="boolean">
+  Whether this role is the boost role of this guild.
+</ResponseField>
+
+<ResponseField name="isIntegration()" type="boolean">
+  Whether this role is managed by an integration.
+  
+  This is usually true for roles such as those created for Twitch subscribers.
+</ResponseField>
+
+<ResponseField name="getIntegrationIdLong()" type="long">
+  The id for the integration associated with this role.
+  
+  Returns 0 if this role is not for an integration.
+</ResponseField>
+
+<ResponseField name="hasSubscriptionListing()" type="boolean">
+  Whether this role can be acquired through a premium subscription purchase.
+</ResponseField>
+
+<ResponseField name="isAvailableForPurchase()" type="boolean">
+  Whether this role has been published for user purchasing.
+</ResponseField>
+
+<ResponseField name="isLinkedRole()" type="boolean">
+  Whether this role is acquired through a user connection.
+</ResponseField>
+
+## Usage Example
+
+```java
+// Get role information
+Role role = guild.getRoleById(roleId);
+System.out.println("Role: " + role.getName());
+System.out.println("Position: " + role.getPosition());
+System.out.println("Color: " + role.getColor());
+
+// Check permissions
+if (role.hasPermission(Permission.ADMINISTRATOR)) {
+    System.out.println("This role has admin permissions");
+}
+
+// Modify role
+role.getManager()
+    .setName("Updated Role")
+    .setColor(Color.BLUE)
+    .setHoisted(true)
+    .setMentionable(true)
+    .queue();
+
+// Create new role
+guild.createRole()
+    .setName("Moderator")
+    .setColor(Color.GREEN)
+    .setPermissions(
+        Permission.KICK_MEMBERS,
+        Permission.BAN_MEMBERS,
+        Permission.MESSAGE_MANAGE
+    )
+    .queue(newRole -> {
+        System.out.println("Created role: " + newRole.getName());
+    });
+
+// Assign role to member
+guild.addRoleToMember(member, role)
+    .queue();
+
+// Remove role from member
+guild.removeRoleFromMember(member, role)
+    .queue();
+
+// Check role tags
+RoleTags tags = role.getTags();
+if (tags.isBot()) {
+    System.out.println("This is a bot role");
+}
+if (tags.isBoost()) {
+    System.out.println("This is the server boost role");
+}
+
+// Compare roles
+if (moderatorRole.canInteract(memberRole)) {
+    System.out.println("Moderator role is higher than member role");
+}
+```
+
+## Constants
+
+<ResponseField name="DEFAULT_COLOR_RAW" type="int">
+  Used to keep consistency between color values: `0x1F_FFFFFF`
+</ResponseField>
+
+## See Also
+
+- [Guild](/api/entities/guild)
+- [Member](/api/entities/member)
+- [Permission](https://docs.jda.wiki/net/dv8tion/jda/api/Permission.html)

@@ -1,0 +1,157 @@
+---
+title: Installation
+description: Add JDA to your Java project using Gradle or Maven
+---
+
+JDA is available on Maven Central. The latest version is always shown in the [GitHub Release](https://github.com/discord-jda/JDA/releases/latest).
+
+## Requirements
+
+The minimum Java version supported by JDA is **Java SE 8**. JDA also uses JSR 305 to support solid interoperability with Kotlin out of the box.
+
+<Note>
+To use JDA for audio connections, you must also add a dependency that implements the [DAVE Protocol](https://daveprotocol.com/). See [Making a Music Bot](https://jda.wiki/using-jda/making-a-music-bot/) for details.
+</Note>
+
+## Installation Methods
+
+<Tabs>
+  <Tab title="Gradle">
+    Add JDA to your `build.gradle` or `build.gradle.kts` file:
+
+    <CodeGroup>
+    ```gradle build.gradle
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        implementation("net.dv8tion:JDA:$version") { // replace $version with the latest version
+          // Optionally disable audio natives to reduce jar size by excluding `opus-java` and `tink`
+          // Gradle DSL:
+          // exclude module: 'opus-java' // required for encoding audio into opus
+          // exclude module: 'tink' // required for encrypting and decrypting audio
+        }
+    }
+    ```
+
+    ```kotlin build.gradle.kts
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        implementation("net.dv8tion:JDA:$version") { // replace $version with the latest version
+          // Optionally disable audio natives to reduce jar size
+          // Kotlin DSL:
+          // exclude(module="opus-java") // required for encoding audio into opus
+          // exclude(module="tink") // required for encrypting and decrypting audio
+        }
+    }
+    ```
+    </CodeGroup>
+
+    <Tip>
+    Replace `$version` with the latest version number from [Maven Central](https://central.sonatype.com/artifact/net.dv8tion/JDA).
+    </Tip>
+  </Tab>
+
+  <Tab title="Maven">
+    Add JDA to your `pom.xml` file:
+
+    ```xml pom.xml
+    <dependency>
+        <groupId>net.dv8tion</groupId>
+        <artifactId>JDA</artifactId>
+        <version>$version</version> <!-- replace $version with the latest version -->
+        <!-- Optionally disable audio natives to reduce jar size by excluding `opus-java` and `tink` -->
+        <exclusions>
+            <!-- required for encoding audio into opus, not needed if audio is already provided in opus encoding
+            <exclusion>
+                <groupId>club.minnced</groupId>
+                <artifactId>opus-java</artifactId>
+            </exclusion> -->
+            <!-- required for encrypting and decrypting audio
+            <exclusion>
+                <groupId>com.google.crypto.tink</groupId>
+                <artifactId>tink</artifactId>
+            </exclusion> -->
+        </exclusions>
+    </dependency>
+    ```
+
+    <Tip>
+    Replace `$version` with the latest version number from [Maven Central](https://central.sonatype.com/artifact/net.dv8tion/JDA).
+    </Tip>
+  </Tab>
+
+  <Tab title="JitPack (Snapshots)">
+    You can also use JitPack to get snapshot builds:
+
+    <CodeGroup>
+    ```gradle build.gradle
+    repositories {
+        maven { url 'https://jitpack.io' }
+    }
+
+    dependencies {
+        implementation 'com.github.discord-jda:JDA:master-SNAPSHOT'
+    }
+    ```
+
+    ```xml pom.xml
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
+    <dependency>
+        <groupId>com.github.discord-jda</groupId>
+        <artifactId>JDA</artifactId>
+        <version>master-SNAPSHOT</version>
+    </dependency>
+    ```
+    </CodeGroup>
+
+    <Note>
+    Snapshot builds are bleeding edge and may contain bugs. Use at your own risk.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Audio Dependencies
+
+By default, JDA includes dependencies for audio support:
+
+- **opus-java** - Required for encoding audio into opus format
+- **tink** - Required for encrypting and decrypting audio
+
+If you're not building a music bot, you can exclude these dependencies to reduce your JAR size as shown in the examples above.
+
+## Verify Installation
+
+After adding JDA to your project, verify the installation by creating a simple test file:
+
+```java Test.java
+import net.dv8tion.jda.api.JDABuilder;
+
+public class Test {
+    public static void main(String[] args) {
+        System.out.println("JDA imported successfully!");
+    }
+}
+```
+
+If your IDE can resolve the import and the code compiles without errors, JDA has been successfully added to your project.
+
+## Next Steps
+
+<Card
+  title="Quick Start Guide"
+  icon="rocket"
+  href="/quickstart"
+>
+  Build your first Discord bot with JDA
+</Card>

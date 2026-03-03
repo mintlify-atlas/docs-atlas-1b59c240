@@ -1,0 +1,671 @@
+---
+title: RestAction
+description: Interface for asynchronous Discord API requests with callback support
+---
+
+A RestAction is JDA's way of handling asynchronous API requests. It provides a terminal interface between the user and Discord's API, allowing you to control how and when requests are executed.
+
+## Overview
+
+RestAction provides three main execution methods:
+- **queue()** - Asynchronous execution with callbacks (recommended)
+- **submit()** - Returns a CompletableFuture for the result
+- **complete()** - Blocks the current thread until completion
+
+## Execution Methods
+
+### queue
+
+Submits the request for asynchronous execution.
+
+<ParamField path="success" type="Consumer<? super T>">
+  Callback executed on success
+</ParamField>
+
+<ParamField path="failure" type="Consumer<? super Throwable>">
+  Callback executed on failure
+</ParamField>
+
+**Variants:**
+- `queue()` - No callbacks, uses defaults
+- `queue(Consumer<T> success)` - Success callback only
+- `queue(Consumer<T> success, Consumer<Throwable> failure)` - Both callbacks
+
+```java
+// Simple queue with no callback
+channel.sendMessage("Hello!").queue();
+
+// With success callback
+channel.sendMessage("Hello!").queue(message -> {
+    System.out.println("Message sent: " + message.getId());
+});
+
+// With both callbacks
+user.openPrivateChannel().queue(
+    channel -> channel.sendMessage("DM sent!").queue(),
+    error -> System.err.println("Failed to open DM: " + error.getMessage())
+);
+```
+
+### submit
+
+Submits the request and returns a CompletableFuture.
+
+<ParamField path="shouldQueue" type="boolean" default="true">
+  Whether to automatically handle rate limits
+</ParamField>
+
+<ResponseField name="return" type="CompletableFuture<T>">
+  Future that completes with the response value
+</ResponseField>
+
+```java
+CompletableFuture<Message> future = channel.sendMessage("Hello!").submit();
+
+future.thenAccept(message -> {
+    System.out.println("Message sent: " + message.getId());
+}).exceptionally(error -> {
+    error.printStackTrace();
+    return null;
+});
+
+// Chain multiple requests
+jda.retrieveUserById(userId).submit()
+    .thenCompose(user -> user.openPrivateChannel().submit())
+    .thenCompose(channel -> channel.sendMessage("Hello!").submit())
+    .whenComplete((msg, error) -> {
+        if (error != null) error.printStackTrace();
+    });
+```
+
+### complete
+
+Blocks the current thread until the request completes.
+
+<ParamField path="shouldQueue" type="boolean" default="true">
+  Whether to automatically handle rate limits
+</ParamField>
+
+<ResponseField name="return" type="T">
+  The response value
+</ResponseField>
+
+<Warning>
+**Not recommended for most use cases.** Blocking threads can cause performance issues. Use `queue()` or `submit()` instead.
+</Warning>
+
+```java
+// Block until message is sent
+Message message = channel.sendMessage("Hello!").complete();
+System.out.println("Sent: " + message.getId());
+
+// This blocks the thread!
+User user = jda.retrieveUserById(userId).complete();
+```
+
+## Transformation Operators
+
+### map
+
+Transforms the result to a different type.
+
+<ParamField path="map" type="Function<? super T, ? extends O>" required>
+  Mapping function to apply
+</ParamField>
+
+<ResponseField name="return" type="RestAction<O>">
+  RestAction with the mapped type
+</ResponseField>
+
+```java
+// Get user's name from ID
+RestAction<String> nameAction = jda.retrieveUserById(userId)
+    .map(User::getName);
+
+nameAction.queue(name -> {
+    System.out.println("User name: " + name);
+});
+
+// Get message content length
+channel.sendMessage("Hello")
+    .map(Message::getContentRaw)
+    .map(String::length)
+    .queue(length -> System.out.println("Length: " + length));
+```
+
+### flatMap
+
+Chains another RestAction based on the result.
+
+<ParamField path="flatMap" type="Function<? super T, ? extends RestAction<O>>" required>
+  Function that returns the next RestAction
+</ParamField>
+
+<ResponseField name="return" type="RestAction<O>">
+  RestAction for the chained operation
+</ResponseField>
+
+```java
+// Send a DM to a user
+jda.retrieveUserById(userId)
+    .flatMap(User::openPrivateChannel)
+    .flatMap(channel -> channel.sendMessage("Hello!"))
+    .queue(message -> System.out.println("DM sent!"));
+
+// Conditional flatMap
+channel.retrieveMessageById(messageId)
+    .flatMap(
+        msg -> msg.getAuthor().isBot(), // condition
+        msg -> msg.delete() // only if condition is true
+    )
+    .queue();
+```
+
+### onSuccess
+
+Executes a consumer on success and continues the chain.
+
+<ParamField path="consumer" type="Consumer<? super T>" required>
+  Consumer to execute on success
+</ParamField>
+
+<ResponseField name="return" type="RestAction<T>">
+  RestAction that consumes but preserves the result
+</ResponseField>
+
+```java
+channel.sendMessage("Hello!")
+    .onSuccess(msg -> System.out.println("Sent: " + msg.getId()))
+    .flatMap(msg -> msg.addReaction("✅"))
+    .queue();
+```
+
+## Error Handling
+
+### onErrorMap
+
+Provides a fallback value on failure.
+
+<ParamField path="condition" type="Predicate<? super Throwable>">
+  Optional condition to check before applying fallback
+</ParamField>
+
+<ParamField path="map" type="Function<? super Throwable, ? extends T>" required>
+  Function to provide fallback value
+</ParamField>
+
+<ResponseField name="return" type="RestAction<T>">
+  RestAction with fallback handling
+</ResponseField>
+
+```java
+import static net.dv8tion.jda.api.requests.ErrorResponse.*;
+
+// Provide default value on any error
+jda.retrieveUserById(userId)
+    .map(User::getName)
+    .onErrorMap(error -> "Unknown User")
+    .queue(name -> System.out.println("Name: " + name));
+
+// Conditional fallback
+user.openPrivateChannel()
+    .flatMap(channel -> channel.sendMessage("Hello"))
+    .onErrorMap(
+        CANNOT_SEND_TO_USER::test,
+        error -> null
+    )
+    .queue();
+```
+
+### onErrorFlatMap
+
+Provides a fallback RestAction on failure.
+
+<ParamField path="condition" type="Predicate<? super Throwable>">
+  Optional condition to check before applying fallback
+</ParamField>
+
+<ParamField path="map" type="Function<? super Throwable, ? extends RestAction<? extends T>>" required>
+  Function to provide fallback action
+</ParamField>
+
+<ResponseField name="return" type="RestAction<T>">
+  RestAction with fallback action
+</ResponseField>
+
+```java
+import static net.dv8tion.jda.api.requests.ErrorResponse.*;
+
+// Try DM, fallback to channel message
+user.openPrivateChannel()
+    .flatMap(channel -> channel.sendMessage("Hello!"))
+    .onErrorFlatMap(
+        CANNOT_SEND_TO_USER::test,
+        error -> textChannel.sendMessage(user.getAsMention() + " Hello!")
+    )
+    .queue();
+```
+
+### mapToResult
+
+Wraps success and failure in a Result object.
+
+<ResponseField name="return" type="RestAction<Result<T>>">
+  RestAction that never fails, wrapping errors in Result
+</ResponseField>
+
+```java
+RestAction<Result<User>> result = jda.retrieveUserById(userId)
+    .mapToResult();
+
+result.queue(r -> {
+    if (r.isSuccess()) {
+        System.out.println("User: " + r.get().getName());
+    } else {
+        System.out.println("Failed: " + r.getFailure());
+    }
+});
+```
+
+## Combining Actions
+
+### and
+
+Combines two RestActions and computes a result from both.
+
+<ParamField path="other" type="RestAction<U>" required>
+  The other action to combine
+</ParamField>
+
+<ParamField path="accumulator" type="BiFunction<? super T, ? super U, ? extends O>">
+  Function to combine results (optional)
+</ParamField>
+
+<ResponseField name="return" type="RestAction<O>">
+  Combined RestAction
+</ResponseField>
+
+```java
+RestAction<User> userAction = jda.retrieveUserById(userId);
+RestAction<Guild> guildAction = jda.retrieveGuildById(guildId);
+
+// Combine both results
+userAction.and(guildAction, (user, guild) -> 
+    user.getName() + " in " + guild.getName()
+).queue(result -> System.out.println(result));
+
+// Just wait for both to complete
+userAction.and(guildAction).queue();
+```
+
+### allOf
+
+Accumulates multiple RestActions into a list.
+
+<ParamField path="first" type="RestAction<? extends E>" required>
+  First action
+</ParamField>
+
+<ParamField path="others" type="RestAction<? extends E>...">
+  Additional actions
+</ParamField>
+
+<ResponseField name="return" type="RestAction<List<E>>">
+  RestAction containing list of all results
+</ResponseField>
+
+```java
+RestAction<List<User>> allUsers = RestAction.allOf(
+    jda.retrieveUserById(id1),
+    jda.retrieveUserById(id2),
+    jda.retrieveUserById(id3)
+);
+
+allUsers.queue(users -> {
+    users.forEach(user -> System.out.println(user.getName()));
+});
+```
+
+### zip
+
+Combines this action with others into a list.
+
+<ParamField path="first" type="RestAction<? extends T>" required>
+  First action to zip
+</ParamField>
+
+<ParamField path="other" type="RestAction<? extends T>...">
+  Additional actions to zip
+</ParamField>
+
+<ResponseField name="return" type="RestAction<List<T>>">
+  RestAction containing list of all results
+</ResponseField>
+
+```java
+RestAction<Message> msg1 = channel.sendMessage("First");
+RestAction<List<Message>> all = msg1.zip(
+    channel.sendMessage("Second"),
+    channel.sendMessage("Third")
+);
+
+all.queue(messages -> {
+    System.out.println("Sent " + messages.size() + " messages");
+});
+```
+
+## Delay Operations
+
+### delay
+
+Delays the result by a specified duration.
+
+<ParamField path="duration" type="Duration | long" required>
+  The delay duration
+</ParamField>
+
+<ParamField path="unit" type="TimeUnit">
+  Time unit for numeric delay
+</ParamField>
+
+<ParamField path="scheduler" type="ScheduledExecutorService">
+  Custom scheduler (null for default)
+</ParamField>
+
+<ResponseField name="return" type="RestAction<T>">
+  RestAction with delay
+</ResponseField>
+
+```java
+// Self-destructing message
+channel.sendMessage("This will be deleted in 5 seconds")
+    .delay(Duration.ofSeconds(5))
+    .flatMap(Message::delete)
+    .queue();
+
+// Chain delays
+channel.sendMessage("Step 1")
+    .delay(2, TimeUnit.SECONDS)
+    .flatMap(msg -> msg.editMessage("Step 2"))
+    .delay(2, TimeUnit.SECONDS)
+    .flatMap(msg -> msg.editMessage("Step 3"))
+    .queue();
+```
+
+### queueAfter
+
+Schedules the action to execute after a delay.
+
+<ParamField path="delay" type="long" required>
+  The delay value
+</ParamField>
+
+<ParamField path="unit" type="TimeUnit" required>
+  Time unit for the delay
+</ParamField>
+
+<ParamField path="success" type="Consumer<? super T>">
+  Success callback
+</ParamField>
+
+<ParamField path="failure" type="Consumer<? super Throwable>">
+  Failure callback
+</ParamField>
+
+<ParamField path="executor" type="ScheduledExecutorService">
+  Custom executor
+</ParamField>
+
+<ResponseField name="return" type="ScheduledFuture<?>">
+  Future for the scheduled operation
+</ResponseField>
+
+```java
+// Delete after 10 seconds
+message.delete().queueAfter(10, TimeUnit.SECONDS);
+
+// With callback
+channel.sendMessage("Delayed").queueAfter(
+    5,
+    TimeUnit.SECONDS,
+    msg -> System.out.println("Sent after delay")
+);
+```
+
+### submitAfter
+
+Schedules the action and returns a CompletableFuture.
+
+<ParamField path="delay" type="long" required>
+  The delay value
+</ParamField>
+
+<ParamField path="unit" type="TimeUnit" required>
+  Time unit for the delay
+</ParamField>
+
+<ParamField path="executor" type="ScheduledExecutorService">
+  Custom executor
+</ParamField>
+
+<ResponseField name="return" type="DelayedCompletableFuture<T>">
+  Future for the delayed operation
+</ResponseField>
+
+```java
+DelayedCompletableFuture<Message> future = 
+    channel.sendMessage("Delayed").submitAfter(5, TimeUnit.SECONDS);
+
+future.thenAccept(msg -> System.out.println("Sent!"));
+```
+
+### completeAfter
+
+Blocks for the delay then executes the action.
+
+<ParamField path="delay" type="long" required>
+  The delay value
+</ParamField>
+
+<ParamField path="unit" type="TimeUnit" required>
+  Time unit for the delay
+</ParamField>
+
+<ResponseField name="return" type="T">
+  The response value
+</ResponseField>
+
+<Warning>
+Blocks the current thread. Not recommended for most use cases.
+</Warning>
+
+## Checks and Timeouts
+
+### setCheck
+
+Sets a last-second check before execution.
+
+<ParamField path="checks" type="BooleanSupplier">
+  Checks to run before executing (null = no checks)
+</ParamField>
+
+<ResponseField name="return" type="RestAction<T>">
+  RestAction with checks
+</ResponseField>
+
+```java
+Message toDelete = /* ... */;
+
+toDelete.delete()
+    .setCheck(() -> !toDelete.isPinned()) // Only delete if not pinned
+    .queue();
+```
+
+### addCheck
+
+Adds additional checks to existing checks.
+
+<ParamField path="checks" type="BooleanSupplier" required>
+  Additional checks to add
+</ParamField>
+
+<ResponseField name="return" type="RestAction<T>">
+  RestAction with added checks
+</ResponseField>
+
+```java
+action.setCheck(() -> condition1())
+    .addCheck(() -> condition2())
+    .queue();
+```
+
+### timeout
+
+Sets a timeout for the action.
+
+<ParamField path="timeout" type="long" required>
+  Timeout value
+</ParamField>
+
+<ParamField path="unit" type="TimeUnit" required>
+  Time unit for timeout
+</ParamField>
+
+<ResponseField name="return" type="RestAction<T>">
+  RestAction with timeout
+</ResponseField>
+
+```java
+jda.retrieveUserById(userId)
+    .timeout(5, TimeUnit.SECONDS)
+    .queue(
+        user -> System.out.println("Found: " + user.getName()),
+        error -> System.err.println("Timed out or failed")
+    );
+```
+
+### deadline
+
+Sets an absolute deadline timestamp.
+
+<ParamField path="timestamp" type="long" required>
+  Millisecond timestamp for deadline
+</ParamField>
+
+<ResponseField name="return" type="RestAction<T>">
+  RestAction with deadline
+</ResponseField>
+
+```java
+long deadline = System.currentTimeMillis() + 10000; // 10 seconds from now
+
+action.deadline(deadline)
+    .queueAfter(20, TimeUnit.SECONDS); // Will timeout after 10 seconds
+```
+
+## Static Configuration
+
+### setDefaultFailure
+
+Sets the default failure callback for all RestActions.
+
+<ParamField path="callback" type="Consumer<? super Throwable>">
+  The default failure handler (null to ignore)
+</ParamField>
+
+```java
+RestAction.setDefaultFailure(error -> {
+    System.err.println("Request failed: " + error.getMessage());
+});
+```
+
+### setDefaultSuccess
+
+Sets the default success callback for all RestActions.
+
+<ParamField path="callback" type="Consumer<Object>">
+  The default success handler (null to ignore)
+</ParamField>
+
+```java
+RestAction.setDefaultSuccess(result -> {
+    System.out.println("Request completed");
+});
+```
+
+### setDefaultTimeout
+
+Sets the default timeout for all RestActions.
+
+<ParamField path="timeout" type="long" required>
+  Timeout value (0 = no timeout)
+</ParamField>
+
+<ParamField path="unit" type="TimeUnit" required>
+  Time unit for timeout
+</ParamField>
+
+```java
+RestAction.setDefaultTimeout(30, TimeUnit.SECONDS);
+```
+
+### setPassContext
+
+Enables context tracking for better error messages.
+
+<ParamField path="enable" type="boolean" required>
+  Whether to track context
+</ParamField>
+
+<Warning>
+**May impact performance.** Creates stack traces for every execution.
+</Warning>
+
+```java
+RestAction.setPassContext(true);
+```
+
+## Best Practices
+
+### Use queue() for Async Operations
+
+```java
+// Good - non-blocking
+channel.sendMessage("Hello").queue();
+
+// Bad - blocks the thread
+channel.sendMessage("Hello").complete();
+```
+
+### Chain Operations with flatMap
+
+```java
+// Good - clean chain
+jda.retrieveUserById(userId)
+    .flatMap(User::openPrivateChannel)
+    .flatMap(channel -> channel.sendMessage("Hello"))
+    .queue();
+
+// Bad - nested callbacks
+jda.retrieveUserById(userId).queue(user -> {
+    user.openPrivateChannel().queue(channel -> {
+        channel.sendMessage("Hello").queue();
+    });
+});
+```
+
+### Handle Errors Gracefully
+
+```java
+user.openPrivateChannel()
+    .flatMap(channel -> channel.sendMessage("Hello"))
+    .queue(
+        message -> System.out.println("DM sent"),
+        error -> System.err.println("Failed to send DM: " + error.getMessage())
+    );
+```
+
+## Related
+
+- [JDA Interface](/api/jda) - Main JDA interface
+- [JDABuilder](/api/jda-builder) - Building JDA instances

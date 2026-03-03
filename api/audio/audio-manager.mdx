@@ -1,0 +1,355 @@
+---
+title: AudioManager
+description: Manage audio connections and handlers for Discord voice channels
+---
+
+The `AudioManager` interface manages audio connections to voice channels and controls audio handlers for sending and receiving audio in a Guild.
+
+<Note>
+  Audio receiving requires the DAVE (Discord Audio Video Encryption) protocol. See the [Discord documentation](https://discord.com/developers/docs/topics/voice-connections#dave-protocol) for more information.
+</Note>
+
+## Getting an AudioManager
+
+Retrieve the AudioManager from a Guild:
+
+```java
+Guild guild = event.getGuild();
+AudioManager audioManager = guild.getAudioManager();
+```
+
+## Connection Methods
+
+### openAudioConnection
+
+Opens an audio connection to a voice channel, or moves an existing connection.
+
+```java
+void openAudioConnection(AudioChannel channel)
+```
+
+<ParamField path="channel" type="AudioChannel" required>
+  The voice or stage channel to connect to
+</ParamField>
+
+**Example:**
+
+```java
+VoiceChannel voiceChannel = guild.getVoiceChannelById("123456789");
+audioManager.openAudioConnection(voiceChannel);
+```
+
+### closeAudioConnection
+
+Closes the current audio connection.
+
+```java
+void closeAudioConnection()
+```
+
+**Example:**
+
+```java
+audioManager.closeAudioConnection();
+```
+
+### isConnected
+
+Checks if there is an active audio connection.
+
+```java
+boolean isConnected()
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` if an active audio connection exists
+</ResponseField>
+
+### getConnectedChannel
+
+Gets the currently connected audio channel.
+
+```java
+AudioChannelUnion getConnectedChannel()
+```
+
+<ResponseField name="returns" type="AudioChannelUnion">
+  The connected channel, or `null` if not connected
+</ResponseField>
+
+## Audio Handler Methods
+
+### setSendingHandler
+
+Sets the handler that provides audio data to send.
+
+```java
+void setSendingHandler(AudioSendHandler handler)
+```
+
+<ParamField path="handler" type="AudioSendHandler">
+  The audio send handler, or `null` to remove
+</ParamField>
+
+**Example:**
+
+```java
+AudioSendHandler sendHandler = new MyAudioSendHandler();
+audioManager.setSendingHandler(sendHandler);
+```
+
+<Note>
+  JDA recommends [LavaPlayer](https://github.com/lavalink-devs/lavaplayer) as an AudioSendHandler implementation.
+</Note>
+
+### getSendingHandler
+
+Gets the current audio send handler.
+
+```java
+AudioSendHandler getSendingHandler()
+```
+
+<ResponseField name="returns" type="AudioSendHandler">
+  The current send handler, or `null` if none is set
+</ResponseField>
+
+### setReceivingHandler
+
+Sets the handler that processes received audio data.
+
+```java
+void setReceivingHandler(AudioReceiveHandler handler)
+```
+
+<ParamField path="handler" type="AudioReceiveHandler">
+  The audio receive handler, or `null` to remove
+</ParamField>
+
+<Warning>
+  Audio receiving requires Discord's DAVE protocol support. This feature may have limited availability.
+</Warning>
+
+**Example:**
+
+```java
+AudioReceiveHandler receiveHandler = new MyAudioReceiveHandler();
+audioManager.setReceivingHandler(receiveHandler);
+```
+
+### getReceivingHandler
+
+Gets the current audio receive handler.
+
+```java
+AudioReceiveHandler getReceivingHandler()
+```
+
+<ResponseField name="returns" type="AudioReceiveHandler">
+  The current receive handler, or `null` if none is set
+</ResponseField>
+
+## Speaking Mode
+
+### setSpeakingMode
+
+Sets the speaking mode for the audio connection.
+
+```java
+void setSpeakingMode(Collection<SpeakingMode> mode)
+void setSpeakingMode(SpeakingMode... mode)
+```
+
+<ParamField path="mode" type="Collection<SpeakingMode>" required>
+  The speaking modes to use (default: `VOICE`)
+</ParamField>
+
+<Warning>
+  This is an incubating feature. Discord has not officially confirmed this will be available to bots.
+</Warning>
+
+**Example:**
+
+```java
+audioManager.setSpeakingMode(SpeakingMode.VOICE, SpeakingMode.PRIORITY_SPEAKER);
+```
+
+### getSpeakingMode
+
+Gets the current speaking mode.
+
+```java
+EnumSet<SpeakingMode> getSpeakingMode()
+```
+
+<ResponseField name="returns" type="EnumSet<SpeakingMode>">
+  The current speaking modes
+</ResponseField>
+
+## Connection Configuration
+
+### setConnectTimeout
+
+Sets the connection timeout in milliseconds.
+
+```java
+void setConnectTimeout(long timeout)
+```
+
+<ParamField path="timeout" type="long" required>
+  Timeout in milliseconds (default: 10000). Set to 0 to wait indefinitely.
+</ParamField>
+
+### getConnectTimeout
+
+Gets the current connection timeout.
+
+```java
+long getConnectTimeout()
+```
+
+<ResponseField name="returns" type="long">
+  The connection timeout in milliseconds
+</ResponseField>
+
+### setAutoReconnect
+
+Sets whether to automatically reconnect on connection loss.
+
+```java
+void setAutoReconnect(boolean shouldReconnect)
+```
+
+<ParamField path="shouldReconnect" type="boolean" required>
+  `true` to enable auto-reconnect (default)
+</ParamField>
+
+### isAutoReconnect
+
+Checks if auto-reconnect is enabled.
+
+```java
+boolean isAutoReconnect()
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` if auto-reconnect is enabled
+</ResponseField>
+
+## Self State Methods
+
+### setSelfMuted
+
+Sets whether the bot should be muted.
+
+```java
+void setSelfMuted(boolean muted)
+```
+
+<ParamField path="muted" type="boolean" required>
+  `true` to mute the bot
+</ParamField>
+
+<Info>
+  When muted, audio packets from the AudioSendHandler will be ignored by Discord.
+</Info>
+
+### isSelfMuted
+
+Checks if the bot is muted.
+
+```java
+boolean isSelfMuted()
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` if the bot is muted
+</ResponseField>
+
+### setSelfDeafened
+
+Sets whether the bot should be deafened.
+
+```java
+void setSelfDeafened(boolean deafened)
+```
+
+<ParamField path="deafened" type="boolean" required>
+  `true` to deafen the bot
+</ParamField>
+
+### isSelfDeafened
+
+Checks if the bot is deafened.
+
+```java
+boolean isSelfDeafened()
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` if the bot is deafened
+</ResponseField>
+
+## Connection Status
+
+### getConnectionStatus
+
+Gets the current connection status.
+
+```java
+ConnectionStatus getConnectionStatus()
+```
+
+<ResponseField name="returns" type="ConnectionStatus">
+  The current connection status
+</ResponseField>
+
+### setConnectionListener
+
+Sets a listener for connection status updates.
+
+```java
+void setConnectionListener(ConnectionListener listener)
+```
+
+<ParamField path="listener" type="ConnectionListener">
+  The connection listener, or `null` to remove
+</ParamField>
+
+### getConnectionListener
+
+Gets the current connection listener.
+
+```java
+ConnectionListener getConnectionListener()
+```
+
+<ResponseField name="returns" type="ConnectionListener">
+  The current connection listener, or `null` if none is set
+</ResponseField>
+
+## Other Methods
+
+### getJDA
+
+Gets the JDA instance this AudioManager belongs to.
+
+```java
+JDA getJDA()
+```
+
+<ResponseField name="returns" type="JDA">
+  The JDA instance
+</ResponseField>
+
+### getGuild
+
+Gets the Guild this AudioManager manages.
+
+```java
+Guild getGuild()
+```
+
+<ResponseField name="returns" type="Guild">
+  The Guild instance
+</ResponseField>

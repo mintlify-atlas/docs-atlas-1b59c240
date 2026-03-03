@@ -1,0 +1,515 @@
+---
+title: Handling Interactions
+description: Work with buttons, select menus, modals, and Components V2 for rich user experiences
+---
+
+Interactions provide rich, interactive experiences in Discord. This guide covers buttons, select menus, modals, and the new Components V2 system.
+
+## Overview
+
+JDA supports several interaction types:
+- **Buttons** - Clickable buttons in messages
+- **Select Menus** - Dropdown menus for user selection
+- **Modals** - Text input forms
+- **Components V2** - Advanced UI components (containers, sections, media galleries)
+
+## Prerequisites
+
+Interactions don't require specific gateway intents, making them ideal for lightweight bots.
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+EnumSet<GatewayIntent> intents = EnumSet.noneOf(GatewayIntent.class);
+JDA jda = JDABuilder.createLight(token, intents)
+    .addEventListeners(new InteractionHandler())
+    .build();
+```
+
+## Buttons
+
+### Creating Buttons
+
+```java
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+
+// Different button styles
+Button primary = Button.primary("id:primary", "Primary");
+Button secondary = Button.secondary("id:secondary", "Secondary");
+Button success = Button.success("id:success", "Success");
+Button danger = Button.danger("id:danger", "Danger");
+Button link = Button.link("https://discord.com", "Visit Discord");
+
+// Send buttons in a message
+channel.sendMessage("Choose an option:")
+    .addComponents(
+        ActionRow.of(primary, secondary, success, danger),
+        ActionRow.of(link)
+    )
+    .queue();
+```
+
+### Button Properties
+
+```java
+import net.dv8tion.jda.api.entities.emoji.Emoji;
+
+// Button with emoji
+Button withEmoji = Button.primary("like", "Like")
+    .withEmoji(Emoji.fromUnicode("U+1F44D"));
+
+// Disabled button
+Button disabled = Button.primary("disabled", "Disabled")
+    .asDisabled();
+
+// Button with just emoji, no label
+Button emojiOnly = Button.secondary("settings", Emoji.fromUnicode("⚙️"));
+```
+
+### Handling Button Clicks
+
+```java
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+
+public class ButtonHandler extends ListenerAdapter {
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        String buttonId = event.getComponentId();
+        
+        switch (buttonId) {
+            case "confirm":
+                event.reply("Confirmed!").setEphemeral(true).queue();
+                break;
+            
+            case "cancel":
+                // Edit the original message to remove buttons
+                event.editMessage("Cancelled.")
+                    .setComponents()  // Removes all components
+                    .queue();
+                break;
+            
+            case "delete":
+                // Delete the original message
+                event.deferEdit().queue();
+                event.getHook().deleteOriginal().queue();
+                break;
+        }
+    }
+}
+```
+
+### User-Specific Buttons
+
+Encode user IDs in button IDs to restrict who can click:
+
+```java
+// When creating the button
+String userId = event.getUser().getId();
+Button userButton = Button.danger(userId + ":delete", "Delete");
+
+event.reply("Are you sure?")
+    .addComponents(ActionRow.of(userButton))
+    .queue();
+
+// When handling the click
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    String[] parts = event.getComponentId().split(":");
+    String authorId = parts[0];
+    String action = parts[1];
+    
+    // Ignore if wrong user clicked
+    if (!authorId.equals(event.getUser().getId())) {
+        return;
+    }
+    
+    // Handle the action
+    if (action.equals("delete")) {
+        event.deferEdit().queue();
+        event.getHook().deleteOriginal().queue();
+    }
+}
+```
+
+## Select Menus
+
+### String Select Menus
+
+```java
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.selections.SelectOption;
+
+StringSelectMenu menu = StringSelectMenu.create("menu:role")
+    .setPlaceholder("Choose your role")
+    .addOption("Tank", "role:tank", "Absorb damage for the team")
+    .addOption("Healer", "role:healer", "Keep teammates alive")
+    .addOption("DPS", "role:dps", "Deal damage to enemies")
+    .setMinValues(1)  // Minimum selections required
+    .setMaxValues(1)  // Maximum selections allowed
+    .build();
+
+channel.sendMessage("Select your role:")
+    .addComponents(ActionRow.of(menu))
+    .queue();
+```
+
+### Select Menu with Default Values
+
+```java
+StringSelectMenu menu = StringSelectMenu.create("settings")
+    .addOption("Notifications", "notif", "Enable notifications")
+    .addOption("Privacy", "privacy", "Privacy settings")
+    .addOption("Display", "display", "Display preferences")
+    .setDefaultValues("notif", "privacy")  // Pre-select options
+    .setMaxValues(3)
+    .build();
+```
+
+### Handling Select Menu Events
+
+```java
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
+
+@Override
+public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+    String menuId = event.getComponentId();
+    
+    if (menuId.equals("menu:role")) {
+        // Get selected values
+        List<String> values = event.getValues();
+        String role = values.get(0);
+        
+        event.reply("You selected: " + role)
+            .setEphemeral(true)
+            .queue();
+    }
+}
+```
+
+### Entity Select Menus
+
+Select Discord entities like users, roles, or channels:
+
+```java
+import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
+import net.dv8tion.jda.api.components.selections.EntitySelectMenu.SelectTarget;
+
+// User select menu
+EntitySelectMenu userMenu = EntitySelectMenu.create("select:user", SelectTarget.USER)
+    .setPlaceholder("Select a user")
+    .setMinValues(1)
+    .setMaxValues(5)
+    .build();
+
+// Role select menu
+EntitySelectMenu roleMenu = EntitySelectMenu.create("select:role", SelectTarget.ROLE)
+    .setPlaceholder("Select roles")
+    .build();
+
+// Channel select menu
+EntitySelectMenu channelMenu = EntitySelectMenu.create("select:channel", SelectTarget.CHANNEL)
+    .setPlaceholder("Select a channel")
+    .build();
+```
+
+## Modals (Text Input Forms)
+
+### Creating and Sending Modals
+
+```java
+import net.dv8tion.jda.api.components.text.TextInput;
+import net.dv8tion.jda.api.components.text.TextInputStyle;
+import net.dv8tion.jda.api.interactions.modals.Modal;
+
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    if (event.getName().equals("feedback")) {
+        TextInput subject = TextInput.create("subject", "Subject", TextInputStyle.SHORT)
+            .setPlaceholder("Brief summary")
+            .setMinLength(5)
+            .setMaxLength(100)
+            .setRequired(true)
+            .build();
+        
+        TextInput body = TextInput.create("body", "Feedback", TextInputStyle.PARAGRAPH)
+            .setPlaceholder("Your detailed feedback")
+            .setMinLength(10)
+            .setMaxLength(1000)
+            .setRequired(true)
+            .build();
+        
+        Modal modal = Modal.create("modal:feedback", "Provide Feedback")
+            .addActionRow(subject)
+            .addActionRow(body)
+            .build();
+        
+        event.replyModal(modal).queue();
+    }
+}
+```
+
+### Handling Modal Submissions
+
+```java
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+
+@Override
+public void onModalInteraction(ModalInteractionEvent event) {
+    if (event.getModalId().equals("modal:feedback")) {
+        String subject = event.getValue("subject").getAsString();
+        String body = event.getValue("body").getAsString();
+        
+        // Process the feedback
+        processFeedback(subject, body);
+        
+        event.reply("Thank you for your feedback!")
+            .setEphemeral(true)
+            .queue();
+    }
+}
+```
+
+## Components V2
+
+<Note>
+Components V2 requires calling `.useComponentsV2()` on your message reply/edit.
+</Note>
+
+### Containers and Sections
+
+Create rich, structured layouts:
+
+```java
+import net.dv8tion.jda.api.components.container.Container;
+import net.dv8tion.jda.api.components.section.Section;
+import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
+import net.dv8tion.jda.api.components.thumbnail.Thumbnail;
+import net.dv8tion.jda.api.components.separator.Separator;
+import net.dv8tion.jda.api.utils.FileUpload;
+
+Container container = Container.of(
+    // Section with thumbnail and text
+    Section.of(
+        Thumbnail.fromFile(FileUpload.fromData(imageBytes, "image.png")),
+        TextDisplay.of("## Welcome to the Server"),
+        TextDisplay.of("Here's some important information"),
+        TextDisplay.of("-# Small footnote text")
+    ),
+    
+    // Separator
+    Separator.createDivider(Separator.Spacing.SMALL),
+    
+    // Section with button
+    Section.of(
+        Button.primary("rules", "Read Rules"),
+        TextDisplay.of("**Rules:** Be respectful to others"),
+        TextDisplay.of("**Status:** Active")
+    )
+);
+
+event.replyComponents(container)
+    .useComponentsV2()  // Required!
+    .setEphemeral(true)
+    .queue();
+```
+
+### Media Galleries
+
+```java
+import net.dv8tion.jda.api.components.mediagallery.MediaGallery;
+import net.dv8tion.jda.api.components.mediagallery.MediaGalleryItem;
+
+MediaGallery gallery = MediaGallery.of(
+    MediaGalleryItem.fromFile(FileUpload.fromData(image1, "photo1.jpg")),
+    MediaGalleryItem.fromFile(FileUpload.fromData(image2, "photo2.jpg")),
+    MediaGalleryItem.fromFile(FileUpload.fromData(image3, "photo3.jpg"))
+);
+
+Container container = Container.of(
+    TextDisplay.of("Check out these images:"),
+    gallery
+);
+
+event.replyComponents(container)
+    .useComponentsV2()
+    .queue();
+```
+
+### File Displays
+
+```java
+import net.dv8tion.jda.api.components.filedisplay.FileDisplay;
+
+FileDisplay file = FileDisplay.fromFile(
+    FileUpload.fromData("{}".getBytes(), "config.json")
+);
+
+Container container = Container.of(
+    TextDisplay.of("Download your configuration:"),
+    file
+);
+```
+
+### Component Replacement
+
+Use unique IDs to replace specific components:
+
+```java
+import net.dv8tion.jda.api.components.replacer.ComponentReplacer;
+
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    // Disable the clicked button
+    MessageComponentTree updated = event.getMessage()
+        .getComponentTree()
+        .replace(ComponentReplacer.byId(
+            event.getButton(),
+            event.getButton().asDisabled()
+        ));
+    
+    event.editComponents(updated).queue();
+}
+
+// Disable all components
+MessageComponentTree allDisabled = event.getMessage()
+    .getComponentTree()
+    .asDisabled();
+
+event.editComponents(allDisabled).queue();
+```
+
+## Interaction Responses
+
+### Response Types
+
+```java
+// Immediate reply (public)
+event.reply("Response").queue();
+
+// Ephemeral reply (only user sees it)
+event.reply("Secret message").setEphemeral(true).queue();
+
+// Deferred reply (shows "thinking" state)
+event.deferReply().queue();
+event.getHook().sendMessage("Done!").queue();
+
+// Edit the original message
+event.editMessage("Updated").queue();
+
+// Deferred edit (no "thinking" state)
+event.deferEdit().queue();
+event.getHook().editOriginal("Updated").queue();
+```
+
+### Following Up
+
+```java
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    // Reply to the interaction
+    event.reply("Processing...").setEphemeral(true).queue();
+    
+    // Send follow-up messages
+    event.getHook()
+        .sendMessage("Step 1 complete")
+        .queue();
+    
+    event.getHook()
+        .sendMessage("Step 2 complete")
+        .queue();
+}
+```
+
+## Best Practices
+
+<Tip>
+**Component Design:**
+- Use descriptive labels and placeholders
+- Limit action rows to 5 per message
+- Each action row can have up to 5 buttons or 1 select menu
+- Disable or remove components after they're used
+</Tip>
+
+<Warning>
+**Important Constraints:**
+- You must respond to interactions within 3 seconds
+- Component custom IDs are limited to 100 characters
+- Use `deferReply()` or `deferEdit()` for long operations
+- Components V2 requires `.useComponentsV2()` on the message
+</Warning>
+
+## Practical Examples
+
+### Confirmation Dialog
+
+```java
+public void showConfirmation(SlashCommandInteractionEvent event) {
+    String userId = event.getUser().getId();
+    
+    event.reply("Are you sure you want to proceed?")
+        .addComponents(
+            ActionRow.of(
+                Button.success(userId + ":confirm", "Yes"),
+                Button.danger(userId + ":cancel", "No")
+            )
+        )
+        .setEphemeral(true)
+        .queue();
+}
+
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    String[] parts = event.getComponentId().split(":");
+    if (!parts[0].equals(event.getUser().getId())) return;
+    
+    if (parts[1].equals("confirm")) {
+        event.editMessage("Confirmed! Processing...")
+            .setComponents()
+            .queue();
+        // Do the action
+    } else {
+        event.editMessage("Cancelled.")
+            .setComponents()
+            .queue();
+    }
+}
+```
+
+### Pagination
+
+```java
+private int currentPage = 0;
+private final int totalPages = 5;
+
+public void showPage(ButtonInteractionEvent event) {
+    event.editMessage("Page " + (currentPage + 1) + " of " + totalPages)
+        .setComponents(
+            ActionRow.of(
+                Button.primary("prev", "Previous")
+                    .asDisabled(currentPage == 0),
+                Button.primary("next", "Next")
+                    .asDisabled(currentPage == totalPages - 1)
+            )
+        )
+        .queue();
+}
+
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    switch (event.getComponentId()) {
+        case "prev" -> currentPage--;
+        case "next" -> currentPage++;
+    }
+    showPage(event);
+}
+```
+
+## Next Steps
+
+- [Set up audio connections](/guides/audio-connections) for voice features
+- [Implement error handling](/guides/error-handling) for robust interactions
+- [Scale with sharding](/guides/sharding) for large bots

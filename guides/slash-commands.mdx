@@ -1,0 +1,539 @@
+---
+title: Implementing Slash Commands
+description: Create modern slash commands for your Discord bot with options and permissions
+---
+
+Slash commands provide a modern, discoverable interface for your bot. This guide shows you how to create and handle slash commands using JDA.
+
+## Overview
+
+Slash commands are:
+- Automatically shown in Discord's command picker
+- Type-safe with built-in validation
+- Support various option types (strings, numbers, users, channels, etc.)
+- Can have permissions and context restrictions
+
+## Prerequisites
+
+Slash commands don't require any special gateway intents, making them perfect for lightweight bots.
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+// Slash commands work with no intents
+EnumSet<GatewayIntent> intents = EnumSet.noneOf(GatewayIntent.class);
+JDA jda = JDABuilder.createLight(token, intents)
+    .addEventListeners(new SlashCommandHandler())
+    .build();
+```
+
+## Complete Example
+
+Here's a full implementation based on SlashBotExample.java:
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.IntegrationType;
+import net.dv8tion.jda.api.interactions.InteractionContextType;
+import net.dv8tion.jda.api.interactions.InteractionHook;
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
+
+import java.util.EnumSet;
+import java.util.concurrent.TimeUnit;
+
+import static net.dv8tion.jda.api.interactions.commands.OptionType.*;
+
+public class SlashBotExample extends ListenerAdapter {
+    public static void main(String[] args) {
+        String token = System.getenv("BOT_TOKEN");
+        
+        EnumSet<GatewayIntent> intents = EnumSet.noneOf(GatewayIntent.class);
+        JDA jda = JDABuilder.createLight(token, intents)
+            .addEventListeners(new SlashBotExample())
+            .build();
+
+        // Register commands
+        CommandListUpdateAction commands = jda.updateCommands();
+
+        // Moderation command with required and optional options
+        commands.addCommands(
+            Commands.slash("ban", "Ban a user from this server")
+                .addOptions(
+                    new OptionData(USER, "user", "The user to ban")
+                        .setRequired(true)
+                )
+                .addOptions(
+                    new OptionData(INTEGER, "del_days", "Delete messages from past days")
+                        .setRequiredRange(0, 7)
+                )
+                .addOptions(
+                    new OptionData(STRING, "reason", "The ban reason")
+                )
+                .setContexts(InteractionContextType.GUILD)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS))
+        );
+
+        // Simple command that works anywhere
+        commands.addCommands(
+            Commands.slash("say", "Makes the bot say what you tell it to")
+                .setContexts(InteractionContextType.ALL)
+                .setIntegrationTypes(IntegrationType.ALL)
+                .addOption(STRING, "content", "What the bot should say", true)
+        );
+
+        // Admin-only command
+        commands.addCommands(
+            Commands.slash("leave", "Make the bot leave the server")
+                .setContexts(InteractionContextType.GUILD)
+                .setDefaultPermissions(DefaultMemberPermissions.DISABLED)
+        );
+
+        // Command with confirmation prompt
+        commands.addCommands(
+            Commands.slash("prune", "Prune messages from this channel")
+                .addOption(INTEGER, "amount", "How many messages to prune (Default 100)")
+                .setContexts(InteractionContextType.GUILD)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MESSAGE_MANAGE))
+        );
+
+        // Send commands to Discord
+        commands.queue();
+    }
+
+    @Override
+    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        switch (event.getName()) {
+            case "ban" -> ban(event);
+            case "say" -> say(event);
+            case "leave" -> leave(event);
+            case "prune" -> prune(event);
+            default -> event.reply("Unknown command").setEphemeral(true).queue();
+        }
+    }
+
+    private void ban(SlashCommandInteractionEvent event) {
+        event.deferReply(true).queue();
+        InteractionHook hook = event.getHook();
+        hook.setEphemeral(true);
+
+        User user = event.getOption("user").getAsUser();
+        Member member = event.getOption("user").getAsMember();
+
+        if (!event.getMember().hasPermission(Permission.BAN_MEMBERS)) {
+            hook.sendMessage("You don't have permission to ban users.").queue();
+            return;
+        }
+
+        int delDays = event.getOption("del_days", 0, OptionMapping::getAsInt);
+        String reason = event.getOption(
+            "reason",
+            () -> "Banned by " + event.getUser().getName(),
+            OptionMapping::getAsString
+        );
+
+        event.getGuild()
+            .ban(user, delDays, TimeUnit.DAYS)
+            .reason(reason)
+            .flatMap(v -> hook.sendMessage("Banned user " + user.getName()))
+            .queue();
+    }
+
+    private void say(SlashCommandInteractionEvent event) {
+        String content = event.getOption("content").getAsString();
+        event.reply(content).queue();
+    }
+
+    private void leave(SlashCommandInteractionEvent event) {
+        if (!event.getMember().hasPermission(Permission.KICK_MEMBERS)) {
+            event.reply("You don't have permissions to kick me.")
+                .setEphemeral(true)
+                .queue();
+        } else {
+            event.reply("Leaving the server... :wave:")
+                .flatMap(v -> event.getGuild().leave())
+                .queue();
+        }
+    }
+
+    private void prune(SlashCommandInteractionEvent event) {
+        int amount = event.getOption(
+            "amount",
+            100,
+            option -> (int) Math.min(200, Math.max(2, option.getAsLong()))
+        );
+
+        String userId = event.getUser().getId();
+
+        event.reply("This will delete " + amount + " messages. Are you sure?")
+            .addComponents(
+                ActionRow.of(
+                    Button.secondary(userId + ":delete", "Nevermind!"),
+                    Button.danger(userId + ":prune:" + amount, "Yes!")
+                )
+            )
+            .queue();
+    }
+
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        String[] id = event.getComponentId().split(":");
+        String authorId = id[0];
+        
+        if (!authorId.equals(event.getUser().getId())) {
+            return;
+        }
+
+        event.deferEdit().queue();
+
+        String type = id[1];
+        if (type.equals("prune")) {
+            int amount = Integer.parseInt(id[2]);
+            event.getChannel()
+                .getIterableHistory()
+                .skipTo(event.getMessageIdLong())
+                .takeAsync(amount)
+                .thenAccept(event.getChannel()::purgeMessages);
+        }
+        
+        event.getHook().deleteOriginal().queue();
+    }
+}
+```
+
+## Creating Commands
+
+<Steps>
+  <Step title="Get the Command Update Action">
+    ```java
+    JDA jda = JDABuilder.createLight(token, intents).build();
+    CommandListUpdateAction commands = jda.updateCommands();
+    ```
+  </Step>
+
+  <Step title="Define Your Commands">
+    Use the `Commands` utility class to create command definitions:
+
+    ```java
+    commands.addCommands(
+        Commands.slash("ping", "Check the bot's latency"),
+        Commands.slash("user", "Get information about a user")
+            .addOption(USER, "target", "The user to get info about", true)
+    );
+    ```
+  </Step>
+
+  <Step title="Send to Discord">
+    Call `queue()` to register the commands:
+
+    ```java
+    commands.queue();
+    ```
+
+    <Note>
+    Global commands can take up to 1 hour to update. Use guild-specific commands for testing:
+    ```java
+    guild.updateCommands().addCommands(...).queue();
+    ```
+    </Note>
+  </Step>
+
+  <Step title="Handle Command Events">
+    Override `onSlashCommandInteraction` in your event listener:
+
+    ```java
+    @Override
+    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        switch (event.getName()) {
+            case "ping" -> handlePing(event);
+            case "user" -> handleUser(event);
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Command Options
+
+Add parameters to your commands with various types:
+
+### Option Types
+
+```java
+import static net.dv8tion.jda.api.interactions.commands.OptionType.*;
+
+commands.addCommands(
+    Commands.slash("config", "Configure bot settings")
+        .addOption(STRING, "setting", "The setting to change", true)
+        .addOption(BOOLEAN, "enabled", "Enable or disable", true)
+        .addOption(INTEGER, "value", "Numeric value")
+        .addOption(NUMBER, "decimal", "Decimal value")
+        .addOption(USER, "target", "Select a user")
+        .addOption(CHANNEL, "destination", "Select a channel")
+        .addOption(ROLE, "role", "Select a role")
+        .addOption(MENTIONABLE, "mention", "User or role")
+        .addOption(ATTACHMENT, "file", "Upload a file")
+);
+```
+
+### Required vs Optional
+
+```java
+commands.addCommands(
+    Commands.slash("remind", "Set a reminder")
+        .addOption(STRING, "message", "Reminder message", true)  // Required
+        .addOption(INTEGER, "minutes", "Minutes until reminder")  // Optional
+);
+```
+
+### Option Ranges and Choices
+
+```java
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+
+commands.addCommands(
+    Commands.slash("volume", "Set music volume")
+        .addOptions(
+            new OptionData(INTEGER, "level", "Volume level")
+                .setRequiredRange(0, 100)  // Restrict to 0-100
+        )
+);
+
+commands.addCommands(
+    Commands.slash("color", "Pick a color")
+        .addOptions(
+            new OptionData(STRING, "choice", "Your favorite color")
+                .addChoice("Red", "red")
+                .addChoice("Blue", "blue")
+                .addChoice("Green", "green")
+        )
+);
+```
+
+## Retrieving Option Values
+
+### Required Options
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    // Required options are never null
+    String content = event.getOption("content").getAsString();
+    User user = event.getOption("user").getAsUser();
+    int amount = event.getOption("amount").getAsInt();
+}
+```
+
+### Optional Options
+
+```java
+// Method 1: Null check
+OptionMapping option = event.getOption("reason");
+if (option != null) {
+    String reason = option.getAsString();
+}
+
+// Method 2: Default value
+int amount = event.getOption("amount", 100, OptionMapping::getAsInt);
+
+// Method 3: Lazy default (Supplier)
+String reason = event.getOption(
+    "reason",
+    () -> "No reason provided",
+    OptionMapping::getAsString
+);
+```
+
+## Responding to Commands
+
+### Immediate Reply
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    event.reply("Pong!").queue();
+}
+```
+
+### Ephemeral Replies
+
+Only visible to the command user:
+
+```java
+event.reply("This is a secret message!")
+    .setEphemeral(true)
+    .queue();
+```
+
+### Deferred Replies
+
+For operations that take time:
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    // Show "Bot is thinking..." message
+    event.deferReply().queue();
+    
+    // Do your long operation
+    performLongOperation();
+    
+    // Send the actual response
+    event.getHook().sendMessage("Operation complete!").queue();
+}
+```
+
+### Using InteractionHook
+
+```java
+event.deferReply(true).queue();  // Ephemeral "thinking" message
+InteractionHook hook = event.getHook();
+
+// All messages from this hook are ephemeral
+hook.setEphemeral(true);
+
+hook.sendMessage("First message").queue();
+hook.sendMessage("Second message").queue();
+```
+
+## Permissions and Context
+
+### Default Permissions
+
+Control who can see the command:
+
+```java
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
+
+// Only users with BAN_MEMBERS permission
+commands.addCommands(
+    Commands.slash("ban", "Ban a user")
+        .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS))
+);
+
+// Only administrators
+commands.addCommands(
+    Commands.slash("config", "Configure the bot")
+        .setDefaultPermissions(DefaultMemberPermissions.DISABLED)
+);
+```
+
+### Interaction Contexts
+
+Specify where commands can be used:
+
+```java
+import net.dv8tion.jda.api.interactions.InteractionContextType;
+
+// Guild only
+commands.addCommands(
+    Commands.slash("ban", "Ban a user")
+        .setContexts(InteractionContextType.GUILD)
+);
+
+// Anywhere (guilds, DMs, group DMs)
+commands.addCommands(
+    Commands.slash("help", "Show help")
+        .setContexts(InteractionContextType.ALL)
+);
+```
+
+### Integration Types
+
+```java
+import net.dv8tion.jda.api.interactions.IntegrationType;
+
+// Can be installed to guilds and user accounts
+commands.addCommands(
+    Commands.slash("translate", "Translate text")
+        .setIntegrationTypes(IntegrationType.ALL)
+);
+```
+
+## Runtime Permission Checks
+
+Always verify permissions when the command executes:
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    Member member = event.getMember();
+    
+    // Check user permissions
+    if (!member.hasPermission(Permission.MANAGE_MESSAGES)) {
+        event.reply("You need Manage Messages permission!")
+            .setEphemeral(true)
+            .queue();
+        return;
+    }
+    
+    // Check bot permissions
+    Member selfMember = event.getGuild().getSelfMember();
+    if (!selfMember.hasPermission(Permission.MANAGE_MESSAGES)) {
+        event.reply("I need Manage Messages permission!")
+            .setEphemeral(true)
+            .queue();
+        return;
+    }
+    
+    // Execute command
+}
+```
+
+## Combining Commands with Components
+
+Create interactive commands with buttons:
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    event.reply("Choose an option:")
+        .addComponents(
+            ActionRow.of(
+                Button.primary("option1", "Option 1"),
+                Button.secondary("option2", "Option 2"),
+                Button.danger("cancel", "Cancel")
+            )
+        )
+        .queue();
+}
+```
+
+## Best Practices
+
+<Tip>
+**Performance:**
+- Use `deferReply()` for operations taking longer than 3 seconds
+- Slash commands don't require any gateway intents
+- Set appropriate permission defaults to reduce misuse
+</Tip>
+
+<Warning>
+**Important Notes:**
+- You must respond to a command within 3 seconds or it times out
+- Global commands can take up to 1 hour to update
+- Use guild commands (`.updateCommands()` on a Guild) for testing
+- Always validate user input even with option constraints
+</Warning>
+
+## Next Steps
+
+- [Handle interactions](/guides/interactions) with buttons, menus, and modals
+- [Implement error handling](/guides/error-handling) for robust commands
+- Learn about [sharding](/guides/sharding) for scaling your bot

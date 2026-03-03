@@ -1,0 +1,300 @@
+---
+title: Button Components
+description: Create interactive button components in Discord messages
+---
+
+## Overview
+
+Buttons are interactive components that users can click in Discord messages. Each button can trigger an interaction event or open a URL.
+
+## Button Types
+
+### Primary Button
+
+Create a blurple primary button.
+
+<ParamField path="customId" type="String" required>
+  The custom ID used to identify this button (max 100 characters)
+</ParamField>
+
+<ParamField path="label" type="String" required>
+  The text displayed on the button (max 80 characters)
+</ParamField>
+
+```java Button.java:201-202
+static Button primary(@Nonnull String customId, @Nonnull String label)
+```
+
+### Secondary Button
+
+Create a gray secondary button.
+
+<ParamField path="customId" type="String" required>
+  The custom ID used to identify this button
+</ParamField>
+
+<ParamField path="label" type="String" required>
+  The text displayed on the button
+</ParamField>
+
+```java
+static Button secondary(@Nonnull String customId, @Nonnull String label)
+```
+
+### Success Button
+
+Create a green success button.
+
+<ParamField path="customId" type="String" required>
+  The custom ID used to identify this button
+</ParamField>
+
+<ParamField path="label" type="String" required>
+  The text displayed on the button
+</ParamField>
+
+```java
+static Button success(@Nonnull String customId, @Nonnull String label)
+```
+
+### Danger Button
+
+Create a red danger button.
+
+<ParamField path="customId" type="String" required>
+  The custom ID used to identify this button
+</ParamField>
+
+<ParamField path="label" type="String" required>
+  The text displayed on the button
+</ParamField>
+
+```java
+static Button danger(@Nonnull String customId, @Nonnull String label)
+```
+
+### Link Button
+
+Create a button that opens a URL when clicked.
+
+<ParamField path="url" type="String" required>
+  The URL to open (max 512 characters)
+</ParamField>
+
+<ParamField path="label" type="String" required>
+  The text displayed on the button
+</ParamField>
+
+```java
+static Button link(@Nonnull String url, @Nonnull String label)
+```
+
+<Note>
+  Link buttons do not send interaction events - they simply open the URL in the user's browser.
+</Note>
+
+## Example: Basic Buttons
+
+```java SlashBotExample.java:248-256
+// prompt the user with a button menu
+event.reply("This will delete " + amount + " messages.\nAre you sure?")
+        .addComponents(ActionRow.of(
+                // this means "<style>(<id>, <label>)"
+                // you can encode anything you want in the id (up to 100 characters)
+                Button.secondary(userId + ":delete", "Nevermind!"),
+                Button.danger(
+                        // the first parameter is the component id we use in onButtonInteraction above
+                        userId + ":prune:" + amount, "Yes!")))
+        .queue();
+```
+
+## Button Customization
+
+### withEmoji()
+
+Add an emoji to the button.
+
+<ParamField path="emoji" type="Emoji" required>
+  The emoji to display on the button
+</ParamField>
+
+```java Button.java:171-174
+default Button withEmoji(@Nullable Emoji emoji) {
+    return new ButtonImpl(
+            getCustomId(), getUniqueId(), getLabel(), getStyle(), getUrl(), getSku(), isDisabled(), emoji)
+            .checkValid();
+}
+```
+
+### withLabel()
+
+Change the button's label.
+
+<ParamField path="label" type="String" required>
+  The new label text (max 80 characters)
+</ParamField>
+
+```java Button.java:195-198
+default Button withLabel(@Nonnull String label) {
+    return new ButtonImpl(
+            getCustomId(), getUniqueId(), label, getStyle(), getUrl(), getSku(), isDisabled(), getEmoji())
+            .checkValid();
+}
+```
+
+### asDisabled() / asEnabled()
+
+Disable or enable the button.
+
+```java Button.java:140-147
+default Button asDisabled() {
+    return (Button) ActionComponent.super.asDisabled();
+}
+
+default Button asEnabled() {
+    return (Button) ActionComponent.super.asEnabled();
+}
+```
+
+## Example: Buttons with Emojis
+
+```java ComponentsV2Example.java:228-230
+ActionRow.of(
+        Button.secondary("previous", "⬅ Social Space"),
+        Button.success("back", "Back").withEmoji(backEmoji),
+        Button.secondary("next", "Prairie Village ➡"))
+```
+
+## Handling Button Interactions
+
+### onButtonInteraction()
+
+Listen for button click events.
+
+```java SlashBotExample.java:133-163
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    // this is the custom id we specified in our button
+    String[] id = event.getComponentId().split(":");
+    String authorId = id[0];
+    String type = id[1];
+    // Check that the button is for the user that clicked it, otherwise just ignore the event (let interaction fail)
+    if (!authorId.equals(event.getUser().getId())) {
+        return;
+    }
+
+    // acknowledge the button was clicked, otherwise the interaction will fail
+    event.deferEdit().queue();
+
+    MessageChannel channel = event.getChannel();
+    switch (type) {
+        case "prune" -> {
+            int amount = Integer.parseInt(id[2]);
+            event.getChannel()
+                    .getIterableHistory()
+                    .skipTo(event.getMessageIdLong())
+                    .takeAsync(amount)
+                    .thenAccept(channel::purgeMessages);
+
+            // delete the prompt message with our buttons
+            event.getHook().deleteOriginal().queue();
+        }
+        case "delete" -> {
+            event.getHook().deleteOriginal().queue();
+        }
+    }
+}
+```
+
+## Button Properties
+
+### getLabel()
+
+Get the button's label text.
+
+```java Button.java:100-101
+@Nonnull
+String getLabel()
+```
+
+### getStyle()
+
+Get the button's style (PRIMARY, SECONDARY, SUCCESS, DANGER, LINK, PREMIUM).
+
+```java Button.java:108-109
+@Nonnull
+ButtonStyle getStyle()
+```
+
+### getCustomId()
+
+Get the custom ID for this button (null for link buttons).
+
+```java
+@Nullable
+String getCustomId()
+```
+
+### getUrl()
+
+Get the URL for link buttons.
+
+```java Button.java:116-117
+@Nullable
+String getUrl()
+```
+
+### getEmoji()
+
+Get the emoji attached to this button.
+
+```java Button.java:135-136
+@Nullable
+EmojiUnion getEmoji()
+```
+
+### isDisabled()
+
+Check if the button is disabled.
+
+```java
+boolean isDisabled()
+```
+
+## Action Rows
+
+Buttons must be placed in action rows. Each action row can contain up to 5 buttons.
+
+```java
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+
+event.reply("Choose an option")
+    .addComponents(
+        ActionRow.of(
+            Button.primary("option1", "Option 1"),
+            Button.primary("option2", "Option 2"),
+            Button.primary("option3", "Option 3")
+        )
+    )
+    .queue();
+```
+
+## Constants
+
+- `Button.LABEL_MAX_LENGTH` - 80 characters maximum for button labels
+- `Button.ID_MAX_LENGTH` - 100 characters maximum for custom IDs
+- `Button.URL_MAX_LENGTH` - 512 characters maximum for URLs
+
+## Best Practices
+
+<Tip>
+  Use meaningful custom IDs that help you identify the button's purpose and context. You can encode multiple pieces of information separated by colons or other delimiters.
+</Tip>
+
+<Warning>
+  Always acknowledge button interactions with `deferEdit()`, `deferReply()`, or an immediate reply/edit, otherwise the interaction will fail after 3 seconds.
+</Warning>
+
+<Note>
+  Link buttons don't require custom IDs and don't trigger interaction events. They're perfect for documentation links, support pages, or external resources.
+</Note>

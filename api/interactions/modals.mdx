@@ -1,0 +1,412 @@
+---
+title: Modal Interactions
+description: Create interactive modal dialogs for user input in Discord
+---
+
+## Overview
+
+Modals are popup forms that appear when triggered by an interaction. They allow you to collect text input from users in a structured format, similar to Discord's native ban or server creation dialogs.
+
+## Creating Modals
+
+### Modal.create()
+
+Create a new modal builder.
+
+<ParamField path="customId" type="String" required>
+  The custom ID used to identify this modal (max 100 characters)
+</ParamField>
+
+<ParamField path="title" type="String" required>
+  The title displayed at the top of the modal (max 45 characters)
+</ParamField>
+
+```java Modal.java:156-157
+static Builder create(@Nonnull String customId, @Nonnull String title)
+```
+
+### Example: Basic Modal
+
+```java Modal.java:50-71
+public void onSlashCommandInteraction(@Nonnull SlashCommandInteractionEvent event)
+{
+    if (event.getName().equals("modmail"))
+    {
+        TextInput subject = TextInput.create("subject", TextInputStyle.SHORT)
+                .setPlaceholder("Subject of this ticket")
+                .setMinLength(10)
+                .setMaxLength(100) // or setRequiredRange(10, 100)
+                .build();
+
+        TextInput body = TextInput.create("body", TextInputStyle.PARAGRAPH)
+                .setPlaceholder("Your concerns go here")
+                .setMinLength(30)
+                .setMaxLength(1000)
+                .build();
+
+        Modal modal = Modal.create("modmail", "Modmail")
+                .addComponents(Label.of("Subject", subject), Label.of("Body", body))
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+}
+```
+
+## Building Modals
+
+### addComponents()
+
+Add components to the modal (max 5 components).
+
+<ParamField path="components" type="ModalTopLevelComponent..." required>
+  The components to add (typically TextInput fields with Labels)
+</ParamField>
+
+```java
+Builder addComponents(@Nonnull ModalTopLevelComponent... components)
+```
+
+### Example: Multi-Field Modal
+
+```java
+TextInput name = TextInput.create("name", TextInputStyle.SHORT)
+    .setLabel("Name")
+    .setPlaceholder("Enter your name")
+    .setRequired(true)
+    .build();
+
+TextInput email = TextInput.create("email", TextInputStyle.SHORT)
+    .setLabel("Email")
+    .setPlaceholder("your.email@example.com")
+    .setRequired(true)
+    .build();
+
+TextInput message = TextInput.create("message", TextInputStyle.PARAGRAPH)
+    .setLabel("Message")
+    .setPlaceholder("What would you like to say?")
+    .setMinLength(20)
+    .setMaxLength(1000)
+    .build();
+
+Modal modal = Modal.create("contact", "Contact Form")
+    .addComponents(
+        Label.of("Name", name),
+        Label.of("Email", email),
+        Label.of("Message", message)
+    )
+    .build();
+
+event.replyModal(modal).queue();
+```
+
+## Text Input Components
+
+### TextInput.create()
+
+Create a text input field.
+
+<ParamField path="customId" type="String" required>
+  The custom ID for this text input
+</ParamField>
+
+<ParamField path="style" type="TextInputStyle" required>
+  The input style (SHORT for single line, PARAGRAPH for multi-line)
+</ParamField>
+
+```java
+TextInput.create(@Nonnull String customId, @Nonnull TextInputStyle style)
+```
+
+### setLabel()
+
+Set the label shown above the input field.
+
+<ParamField path="label" type="String" required>
+  The label text (max 45 characters)
+</ParamField>
+
+```java
+TextInput.Builder setLabel(@Nonnull String label)
+```
+
+### setPlaceholder()
+
+Set placeholder text shown when the input is empty.
+
+<ParamField path="placeholder" type="String" required>
+  The placeholder text (max 100 characters)
+</ParamField>
+
+```java
+TextInput.Builder setPlaceholder(@Nullable String placeholder)
+```
+
+### setMinLength() / setMaxLength()
+
+Set length constraints for the input.
+
+<ParamField path="minLength" type="int" required>
+  Minimum length (0-4000)
+</ParamField>
+
+<ParamField path="maxLength" type="int" required>
+  Maximum length (1-4000)
+</ParamField>
+
+```java
+TextInput.Builder setMinLength(int minLength)
+TextInput.Builder setMaxLength(int maxLength)
+```
+
+### setRequired()
+
+Set whether this field must be filled out.
+
+<ParamField path="required" type="boolean" required>
+  Whether the field is required (default: true)
+</ParamField>
+
+```java
+TextInput.Builder setRequired(boolean required)
+```
+
+### setValue()
+
+Set a pre-filled value for the input.
+
+<ParamField path="value" type="String" required>
+  The pre-filled value
+</ParamField>
+
+```java
+TextInput.Builder setValue(@Nullable String value)
+```
+
+## Input Styles
+
+### SHORT
+
+Single-line text input for short responses.
+
+```java
+TextInput input = TextInput.create("username", TextInputStyle.SHORT)
+    .setLabel("Username")
+    .setMaxLength(32)
+    .build();
+```
+
+### PARAGRAPH
+
+Multi-line text input for longer responses.
+
+```java
+TextInput input = TextInput.create("feedback", TextInputStyle.PARAGRAPH)
+    .setLabel("Feedback")
+    .setMinLength(50)
+    .setMaxLength(2000)
+    .build();
+```
+
+## Handling Modal Submissions
+
+### onModalInteraction()
+
+Listen for modal submission events.
+
+```java
+@Override
+public void onModalInteraction(ModalInteractionEvent event) {
+    if (event.getModalId().equals("modmail")) {
+        String subject = event.getValue("subject").getAsString();
+        String body = event.getValue("body").getAsString();
+        
+        // Process the modal data
+        processModmail(subject, body);
+        
+        event.reply("Thank you for your submission!")
+            .setEphemeral(true)
+            .queue();
+    }
+}
+```
+
+### Getting Values
+
+```java ModalInteraction.java:88-94
+default ModalMapping getValue(@Nonnull String customId) {
+    Checks.notNull(customId, "ID");
+    return getValues().stream()
+            .filter(mapping -> mapping.getCustomId().equals(customId))
+            .findFirst()
+            .orElse(null);
+}
+```
+
+### Example: Processing Form Data
+
+```java
+@Override
+public void onModalInteraction(ModalInteractionEvent event) {
+    if (event.getModalId().equals("contact")) {
+        String name = event.getValue("name").getAsString();
+        String email = event.getValue("email").getAsString();
+        String message = event.getValue("message").getAsString();
+        
+        // Validate email
+        if (!email.contains("@")) {
+            event.reply("Invalid email address!")
+                .setEphemeral(true)
+                .queue();
+            return;
+        }
+        
+        // Save to database
+        saveContactForm(name, email, message);
+        
+        event.reply("Your message has been sent! We'll get back to you soon.")
+            .setEphemeral(true)
+            .queue();
+    }
+}
+```
+
+## Modal Properties
+
+### getId()
+
+Get the modal's custom ID.
+
+```java Modal.java:99-100
+@Nonnull
+String getId()
+```
+
+### getTitle()
+
+Get the modal's title.
+
+```java Modal.java:106-107
+@Nonnull
+String getTitle()
+```
+
+### getComponents()
+
+Get the list of components in this modal.
+
+```java Modal.java:115-116
+@Nonnull
+List<ModalTopLevelComponentUnion> getComponents()
+```
+
+## ModalMapping
+
+### getAsString()
+
+Get the submitted value as a string.
+
+```java
+String getAsString()
+```
+
+### getCustomId()
+
+Get the custom ID of this input field.
+
+```java
+String getCustomId()
+```
+
+### getType()
+
+Get the component type.
+
+```java
+Component.Type getType()
+```
+
+## Replying with Modals
+
+Modals can only be sent as a reply to certain interactions.
+
+### From Slash Commands
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    if (event.getName().equals("feedback")) {
+        Modal modal = createFeedbackModal();
+        event.replyModal(modal).queue();
+    }
+}
+```
+
+### From Button Interactions
+
+```java
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    if (event.getComponentId().equals("report")) {
+        Modal modal = createReportModal();
+        event.replyModal(modal).queue();
+    }
+}
+```
+
+### From Select Menu Interactions
+
+```java
+@Override
+public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+    if (event.getComponentId().equals("support-topic")) {
+        String topic = event.getValues().get(0);
+        Modal modal = createSupportModal(topic);
+        event.replyModal(modal).queue();
+    }
+}
+```
+
+## Editing Messages After Modal
+
+If a modal was shown in response to a component interaction, you can edit the original message.
+
+```java
+@Override
+public void onModalInteraction(ModalInteractionEvent event) {
+    if (event.getModalId().equals("edit-message")) {
+        String newContent = event.getValue("content").getAsString();
+        
+        // Edit the original message that had the button
+        event.deferEdit().queue();
+        event.getHook().editOriginal(newContent).queue();
+    }
+}
+```
+
+## Constants
+
+- `Modal.MAX_COMPONENTS` - Maximum of 5 components per modal
+- `Modal.MAX_ID_LENGTH` - 100 characters for custom IDs
+- `Modal.MAX_TITLE_LENGTH` - 45 characters for modal titles
+- `TextInput.MAX_LABEL_LENGTH` - 45 characters for input labels
+- `TextInput.MAX_PLACEHOLDER_LENGTH` - 100 characters for placeholders
+- `TextInput.MAX_VALUE_LENGTH` - 4000 characters for input values
+
+## Best Practices
+
+<Tip>
+  Use SHORT style for single-line inputs like names, usernames, or short answers. Use PARAGRAPH style for longer text like feedback, descriptions, or messages.
+</Tip>
+
+<Warning>
+  You must respond to modal interactions within 3 seconds using `reply()`, `deferReply()`, `deferEdit()`, or `editMessage()`. Otherwise, the interaction will fail.
+</Warning>
+
+<Note>
+  Modals can only be shown as a response to interactions - you cannot send them in regular messages. They must be triggered by slash commands, buttons, or select menus.
+</Note>
+
+<Tip>
+  Set appropriate min/max length constraints to guide users and prevent invalid submissions. For example, require at least 20 characters for meaningful feedback.
+</Tip>

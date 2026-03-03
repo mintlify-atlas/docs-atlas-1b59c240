@@ -1,0 +1,359 @@
+---
+title: Channel
+description: API reference for Channel entities in JDA
+---
+
+Represents Discord channels of various types. This is the abstract interface for all channel types.
+
+## Overview
+
+JDA provides various channel types representing different kinds of Discord channels. All channels implement the base `Channel` interface.
+
+## Channel Types
+
+Discord has several channel types, each with specific purposes:
+
+### Text Channels
+
+**TextChannel** - Standard text channels in guilds
+- Send and receive messages
+- Support threads, webhooks, and channel permissions
+- Can be organized in categories
+
+```java
+TextChannel textChannel = guild.getTextChannelById(channelId);
+textChannel.sendMessage("Hello!").queue();
+```
+
+### Voice Channels
+
+**VoiceChannel** - Voice communication channels in guilds
+- Support voice and video communication
+- Can have user limits and bitrate settings
+- Support stage instances for events
+
+```java
+VoiceChannel voiceChannel = guild.getVoiceChannelById(channelId);
+int bitrate = voiceChannel.getBitrate();
+```
+
+### Private Channels
+
+**PrivateChannel** - Direct message channels between users
+- One-on-one communication
+- No guild context
+
+```java
+user.openPrivateChannel()
+    .flatMap(channel -> channel.sendMessage("Hello!"))
+    .queue();
+```
+
+### Thread Channels
+
+**ThreadChannel** - Temporary sub-channels for organized discussions
+- Created from messages or as standalone threads
+- Can be public or private
+- Automatically archive after inactivity
+
+```java
+ThreadChannel thread = textChannel.createThreadChannel("Discussion", true)
+    .queue();
+```
+
+### Forum Channels
+
+**ForumChannel** - Post-based discussion channels
+- Each post is a thread
+- Support tags for organization
+- Can require tags and have post guidelines
+
+```java
+ForumChannel forum = guild.getForumChannelById(channelId);
+forum.createForumPost("Topic", MessageCreateData.fromContent("Content"))
+    .queue();
+```
+
+### Category Channels
+
+**Category** - Organizational containers for other channels
+- Group channels together
+- Apply permissions to all child channels
+
+```java
+Category category = guild.getCategoryById(categoryId);
+List<GuildChannel> channels = category.getChannels();
+```
+
+## Base Channel Properties
+
+### Common Methods
+
+<ResponseField name="getId()" type="String">
+  The Snowflake id of this channel.
+  
+  ```java
+  String channelId = channel.getId();
+  ```
+</ResponseField>
+
+<ResponseField name="getIdLong()" type="long">
+  The Snowflake id of this channel as a primitive long.
+  
+  ```java
+  long channelId = channel.getIdLong();
+  ```
+</ResponseField>
+
+<ResponseField name="getName()" type="String">
+  The human readable name of this channel.
+  
+  ```java
+  String name = channel.getName();
+  ```
+</ResponseField>
+
+<ResponseField name="getType()" type="ChannelType">
+  The ChannelType for this channel.
+  
+  ```java
+  ChannelType type = channel.getType();
+  if (type == ChannelType.TEXT) {
+      // Handle text channel
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getJDA()" type="JDA">
+  Returns the JDA instance of this channel.
+  
+  ```java
+  JDA jda = channel.getJDA();
+  ```
+</ResponseField>
+
+<ResponseField name="getAsMention()" type="String">
+  Returns a mention tag for this channel.
+  
+  ```java
+  String mention = channel.getAsMention(); // Returns: <#channelId>
+  ```
+</ResponseField>
+
+## Guild Channel Properties
+
+For channels in guilds (TextChannel, VoiceChannel, etc.):
+
+<ResponseField name="getGuild()" type="Guild">
+  The Guild this channel belongs to.
+  
+  ```java
+  Guild guild = guildChannel.getGuild();
+  ```
+</ResponseField>
+
+<ResponseField name="getPosition()" type="int">
+  The position of this channel in the channel list.
+  
+  ```java
+  int position = guildChannel.getPosition();
+  ```
+</ResponseField>
+
+<ResponseField name="getParentCategory()" type="Category">
+  The parent Category of this channel.
+  
+  Returns `null` if this channel doesn't have a parent category.
+  
+  ```java
+  Category parent = guildChannel.getParentCategory();
+  ```
+</ResponseField>
+
+## Message Channel Properties
+
+For channels that support messages (TextChannel, PrivateChannel, ThreadChannel):
+
+<ResponseField name="sendMessage(CharSequence content)" type="MessageCreateAction">
+  Sends a message to this channel.
+  
+  ```java
+  channel.sendMessage("Hello, world!")
+      .queue();
+  ```
+</ResponseField>
+
+<ResponseField name="sendMessageEmbeds(MessageEmbed... embeds)" type="MessageCreateAction">
+  Sends embeds to this channel.
+  
+  ```java
+  EmbedBuilder embed = new EmbedBuilder()
+      .setTitle("Title")
+      .setDescription("Description");
+  
+  channel.sendMessageEmbeds(embed.build())
+      .queue();
+  ```
+</ResponseField>
+
+<ResponseField name="retrieveMessageById(String messageId)" type="RestAction<Message>">
+  Retrieves a message by its id.
+  
+  ```java
+  channel.retrieveMessageById(messageId)
+      .queue(message -> {
+          System.out.println(message.getContentDisplay());
+      });
+  ```
+</ResponseField>
+
+<ResponseField name="getHistory()" type="MessageHistory">
+  Gets the MessageHistory for this channel.
+  
+  ```java
+  MessageHistory history = channel.getHistory();
+  history.retrievePast(100).queue(messages -> {
+      System.out.println("Retrieved " + messages.size() + " messages");
+  });
+  ```
+</ResponseField>
+
+## Channel Management
+
+### Deletion
+
+<ParamField path="delete()" type="RestAction<Void>">
+  Deletes this channel.
+  
+  ```java
+  channel.delete()
+      .reason("No longer needed")
+      .queue();
+  ```
+</ParamField>
+
+### Editing (Guild Channels)
+
+<ParamField path="getManager()" type="ChannelManager">
+  The ChannelManager for this channel. Used to modify channel settings.
+  
+  ```java
+  textChannel.getManager()
+      .setName("new-name")
+      .setTopic("New topic")
+      .queue();
+  ```
+</ParamField>
+
+## Usage Examples
+
+### Creating Channels
+
+```java
+// Create text channel
+guild.createTextChannel("general")
+    .setTopic("General discussion")
+    .setParent(category)
+    .queue();
+
+// Create voice channel
+guild.createVoiceChannel("Voice Chat")
+    .setUserLimit(10)
+    .setBitrate(96000)
+    .queue();
+
+// Create thread
+textChannel.createThreadChannel("Discussion", true)
+    .queue(thread -> {
+        thread.sendMessage("Welcome to the thread!").queue();
+    });
+```
+
+### Working with Messages
+
+```java
+// Send message
+MessageCreateAction action = channel.sendMessage("Hello!");
+action.queue();
+
+// Send with embed
+EmbedBuilder embed = new EmbedBuilder()
+    .setTitle("Announcement")
+    .setDescription("Important message");
+
+channel.sendMessageEmbeds(embed.build())
+    .queue();
+
+// Retrieve message history
+channel.getHistory()
+    .retrievePast(50)
+    .queue(messages -> {
+        for (Message msg : messages) {
+            System.out.println(msg.getContentDisplay());
+        }
+    });
+```
+
+### Managing Permissions
+
+```java
+// Add permission override
+textChannel.upsertPermissionOverride(role)
+    .grant(Permission.MESSAGE_SEND)
+    .deny(Permission.MESSAGE_MANAGE)
+    .queue();
+
+// Remove permission override
+textChannel.getPermissionOverride(member)
+    .delete()
+    .queue();
+```
+
+### Modifying Channels
+
+```java
+// Modify text channel
+textChannel.getManager()
+    .setName("updated-name")
+    .setTopic("New topic")
+    .setSlowmode(5) // 5 second slowmode
+    .queue();
+
+// Modify voice channel
+voiceChannel.getManager()
+    .setUserLimit(20)
+    .setBitrate(128000)
+    .queue();
+
+// Move channel position
+channel.getManager()
+    .setPosition(0) // Move to top
+    .queue();
+```
+
+## Channel Type Constants
+
+The `ChannelType` enum includes:
+
+- `TEXT` - Guild text channel
+- `PRIVATE` - Private direct message channel
+- `VOICE` - Guild voice channel
+- `CATEGORY` - Channel category
+- `NEWS` - Guild news/announcement channel
+- `STAGE` - Stage voice channel
+- `GUILD_PUBLIC_THREAD` - Public thread channel
+- `GUILD_PRIVATE_THREAD` - Private thread channel
+- `FORUM` - Forum channel
+- `MEDIA` - Media channel
+
+## Constants
+
+<ResponseField name="MAX_NAME_LENGTH" type="int">
+  The maximum length a channel name can be: `100`
+</ResponseField>
+
+## See Also
+
+- [Guild](/api/entities/guild)
+- [Message](/api/entities/message)
+- [Member](/api/entities/member)

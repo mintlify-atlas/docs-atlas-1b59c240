@@ -1,0 +1,646 @@
+---
+title: Frequently Asked Questions
+description: Common questions about JDA and Discord bot development
+---
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="What is JDA?">
+    JDA (Java Discord API) is an open-source Java library that wraps the Discord API, providing a simple and efficient way to build Discord bots using Java.
+
+    **Key Features:**
+    - Event-driven architecture for real-time responses
+    - Full REST API coverage with rate limit handling
+    - Customizable caching for optimal performance
+    - Support for all Discord features (commands, buttons, modals, etc.)
+    - Compatible with Java 8+ and Kotlin
+  </Accordion>
+
+  <Accordion title="What Java version do I need?">
+    **Minimum Requirement:** Java SE 8
+
+    JDA supports Java 8 and higher, including modern LTS versions like Java 17 and Java 21.
+
+    ```bash
+    # Check your Java version
+    java -version
+    ```
+
+    <Tip>
+      While JDA supports Java 8, using Java 17 or 21 is recommended for better performance and security.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="Is JDA free to use?">
+    Yes! JDA is completely free and open-source, licensed under the Apache License 2.0.
+
+    You can:
+    - Use it for personal projects
+    - Use it for commercial bots
+    - Modify the source code
+    - Contribute back to the project
+
+    See the [license](https://github.com/discord-jda/JDA/blob/master/LICENSE) for full details.
+  </Accordion>
+
+  <Accordion title="Can I use JDA with Kotlin?">
+    Absolutely! JDA has excellent Kotlin support through JSR 305 annotations.
+
+    For an even better Kotlin experience, check out [jda-ktx](https://github.com/MinnDevelopment/jda-ktx):
+
+    ```kotlin
+    fun main() {
+        val jda = light(BOT_TOKEN)
+        
+        jda.onCommand("ping") { event ->
+            val time = measureTime {
+                event.reply("Pong!").await()
+            }.inWholeMilliseconds
+            
+            event.hook.editOriginal("Pong: $time ms").queue()
+        }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Where can I get help?">
+    **Official Resources:**
+    - [JDA Wiki](https://jda.wiki) - Comprehensive guides and tutorials
+    - [Javadocs](https://docs.jda.wiki) - Complete API documentation
+    - [GitHub Repository](https://github.com/discord-jda/JDA) - Source code and issues
+    - [Discord Server](https://discord.gg/0hMr4ce0tIl3SLv5) - Community support
+
+    **Community Resources:**
+    - Stack Overflow (tag: `jda`)
+    - Reddit: r/Discord_Bots
+    - YouTube tutorials
+  </Accordion>
+</AccordionGroup>
+
+## Getting Started
+
+<AccordionGroup>
+  <Accordion title="How do I create a Discord bot?">
+    **Step-by-step:**
+
+    1. **Create Application in Discord Developer Portal**
+       - Go to [discord.com/developers/applications](https://discord.com/developers/applications)
+       - Click "New Application"
+       - Navigate to "Bot" section and create a bot
+       - Copy the bot token (keep it secret!)
+
+    2. **Add JDA to Your Project**
+       ```gradle
+       dependencies {
+           implementation("net.dv8tion:JDA:6.3.1")
+       }
+       ```
+
+    3. **Write Your First Bot**
+       ```java
+       public class MyBot {
+           public static void main(String[] args) {
+               JDABuilder.createDefault("YOUR_TOKEN_HERE")
+                   .addEventListeners(new MyListener())
+                   .build();
+           }
+       }
+       ```
+
+    See the [Getting Started](/getting-started/quickstart) guide for more details.
+  </Accordion>
+
+  <Accordion title="How do I invite my bot to a server?">
+    1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+    2. Select your application
+    3. Go to "OAuth2" → "URL Generator"
+    4. Select scopes:
+       - `bot` - Required for bot functionality
+       - `applications.commands` - Required for slash commands
+    5. Select bot permissions needed
+    6. Copy the generated URL and open it in a browser
+    7. Select a server and authorize
+
+    **Minimal Permission Invite URL:**
+    ```
+    https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=0&scope=bot%20applications.commands
+    ```
+  </Accordion>
+
+  <Accordion title="What are Gateway Intents and why do I need them?">
+    Gateway Intents control what events your bot receives from Discord. They help reduce bandwidth and processing for events you don't need.
+
+    **Unprivileged Intents** (always available):
+    - `GUILD_MESSAGES` - Message events in servers
+    - `DIRECT_MESSAGES` - DM events
+    - `GUILD_MESSAGE_REACTIONS` - Reaction events
+
+    **Privileged Intents** (require enabling in Developer Portal):
+    - `MESSAGE_CONTENT` - Access to message text
+    - `GUILD_MEMBERS` - Member join/leave, member cache
+    - `GUILD_PRESENCES` - User status and activities
+
+    ```java
+    JDABuilder.createDefault(token,
+        GatewayIntent.GUILD_MESSAGES,
+        GatewayIntent.MESSAGE_CONTENT
+    ).build();
+    ```
+
+    Learn more: [Gateway Intents Guide](/core-concepts/gateway-intents)
+  </Accordion>
+
+  <Accordion title="Should I use JDABuilder.createDefault() or createLight()?">
+    **Choose based on your use case:**
+
+    | Builder | Use Case | Cache Behavior |
+    |---------|----------|----------------|
+    | `createDefault()` | General-purpose bots | Caches users, members, and all flags |
+    | `createLight()` | Minimal bots, slash commands only | Minimal caching, voice users only |
+    | `create()` | Large bots needing full cache | All users, all members, chunking enabled |
+
+    **Examples:**
+
+    ```java
+    // For slash command bots (no message commands)
+    JDA jda = JDABuilder.createLight(token, Collections.emptyList())
+        .build();
+
+    // For general bots
+    JDA jda = JDABuilder.createDefault(token, 
+        GatewayIntent.GUILD_MESSAGES,
+        GatewayIntent.MESSAGE_CONTENT
+    ).build();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Commands and Interactions
+
+<AccordionGroup>
+  <Accordion title="Should I use slash commands or message commands?">
+    **Slash Commands (Recommended):**
+    - Native Discord feature
+    - Better user experience with auto-complete
+    - No need for `MESSAGE_CONTENT` intent
+    - Shown in Discord's UI automatically
+    - Support for options, choices, and permissions
+
+    **Message Commands (Legacy):**
+    - Requires `MESSAGE_CONTENT` privileged intent
+    - More flexible parsing
+    - Can be used with prefix-based systems
+    - Will require verification for bots in 100+ servers
+
+    <Warning>
+      Discord strongly encourages using slash commands. Message content will be restricted for verified bots.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="How do I create a slash command?">
+    **Register the command:**
+
+    ```java
+    jda.updateCommands().addCommands(
+        Commands.slash("ping", "Check bot latency"),
+        Commands.slash("echo", "Repeat a message")
+            .addOption(OptionType.STRING, "message", "The message to repeat", true)
+    ).queue();
+    ```
+
+    **Handle the command:**
+
+    ```java
+    @Override
+    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        if (event.getName().equals("ping")) {
+            long time = System.currentTimeMillis();
+            event.reply("Pong!").setEphemeral(true)
+                .flatMap(v -> event.getHook()
+                    .editOriginalFormat("Pong: %d ms", 
+                        System.currentTimeMillis() - time)
+                ).queue();
+        } else if (event.getName().equals("echo")) {
+            String message = event.getOption("message").getAsString();
+            event.reply(message).queue();
+        }
+    }
+    ```
+
+    See [Slash Commands Guide](/guides/slash-commands) for more details.
+  </Accordion>
+
+  <Accordion title="Why aren't my commands showing up?">
+    **Common causes:**
+
+    1. **Commands not registered** - Make sure you call `updateCommands().queue()`
+    2. **Global command delay** - Global commands can take up to 1 hour to appear
+    3. **Wrong scope** - Missing `applications.commands` when inviting bot
+    4. **Cache issue** - Restart Discord client
+
+    **Quick fix - use guild commands for testing:**
+    ```java
+    // Guild commands update instantly
+    guild.updateCommands().addCommands(
+        Commands.slash("test", "Testing command")
+    ).queue();
+    ```
+  </Accordion>
+
+  <Accordion title="How do I make buttons and dropdown menus?">
+    **Create components:**
+
+    ```java
+    event.reply("Choose an option:")
+        .addActionRow(
+            Button.primary("button1", "Option 1"),
+            Button.secondary("button2", "Option 2"),
+            Button.danger("cancel", "Cancel")
+        )
+        .queue();
+    ```
+
+    **Handle interactions:**
+
+    ```java
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        switch (event.getComponentId()) {
+            case "button1" ->
+                event.reply("You chose option 1!").setEphemeral(true).queue();
+            case "button2" ->
+                event.reply("You chose option 2!").setEphemeral(true).queue();
+            case "cancel" ->
+                event.getMessage().delete().queue();
+        }
+    }
+    ```
+
+    **Dropdown menus:**
+
+    ```java
+    StringSelectMenu menu = StringSelectMenu.create("menu:options")
+        .addOption("Option A", "a", "Description A")
+        .addOption("Option B", "b", "Description B")
+        .addOption("Option C", "c", "Description C")
+        .build();
+
+    event.reply("Select an option:")
+        .addActionRow(menu)
+        .queue();
+    ```
+  </Accordion>
+
+  <Accordion title="What is the 3-second interaction timeout?">
+    Discord requires interactions to be acknowledged within 3 seconds, or they fail with "Unknown Interaction" error.
+
+    **Solutions:**
+
+    1. **Immediate response:**
+    ```java
+    event.reply("Done!").queue();
+    ```
+
+    2. **Defer if processing takes time:**
+    ```java
+    event.deferReply().queue();
+    // Do long task...
+    event.getHook().sendMessage("Finished!").queue();
+    ```
+
+    3. **Defer as ephemeral (only user can see):**
+    ```java
+    event.deferReply(true).queue();
+    ```
+
+    <Warning>
+      Always call `reply()` or `deferReply()` within 3 seconds of receiving an interaction!
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## RestAction and Async Operations
+
+<AccordionGroup>
+  <Accordion title="What is RestAction and why use queue()?">
+    `RestAction` is JDA's lazy request builder. **Nothing happens until you call a completion method:**
+
+    - `.queue()` - Send asynchronously (recommended)
+    - `.submit()` - Returns a `Future`
+    - `.complete()` - Blocks until complete (avoid in event handlers!)
+
+    **Example:**
+    ```java
+    // This does NOTHING - no request is sent!
+    channel.sendMessage("Hello");
+
+    // This sends the message
+    channel.sendMessage("Hello").queue();
+
+    // With callback
+    channel.sendMessage("Hello").queue(
+        message -> System.out.println("Sent: " + message.getId()),
+        error -> System.err.println("Failed: " + error)
+    );
+    ```
+
+    Learn more: [RestAction Guide](/core-concepts/rest-actions)
+  </Accordion>
+
+  <Accordion title="How do I chain multiple RestActions?">
+    Use `flatMap()` to chain dependent operations:
+
+    ```java
+    channel.sendMessage("Delete in 10 seconds...")
+        .delay(10, TimeUnit.SECONDS)
+        .flatMap(Message::delete)
+        .queue();
+    ```
+
+    **Run multiple actions in parallel:**
+    ```java
+    RestAction.allOf(
+        channel1.sendMessage("Message 1"),
+        channel2.sendMessage("Message 2"),
+        channel3.sendMessage("Message 3")
+    ).queue();
+    ```
+
+    **Combine results:**
+    ```java
+    RestAction<Member> action1 = guild.retrieveMemberById(id1);
+    RestAction<Member> action2 = guild.retrieveMemberById(id2);
+    
+    action1.and(action2, (member1, member2) -> {
+        // Both members retrieved
+        return member1.getEffectiveName() + " and " + member2.getEffectiveName();
+    }).queue(result -> System.out.println(result));
+    ```
+  </Accordion>
+
+  <Accordion title="Should I use queue() or complete()?">
+    **Use `.queue()` (asynchronous) in almost all cases:**
+    - Non-blocking
+    - Better performance
+    - Required in event handlers
+    - Handles rate limits automatically
+
+    **Only use `.complete()` (blocking) when:**
+    - Running in a separate thread (not event handler)
+    - You absolutely need the result immediately
+    - In main method initialization
+
+    ```java
+    // ✅ Good - async in event handler
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        event.getChannel().sendMessage("Hello").queue();
+    }
+
+    // ❌ Bad - blocking in event handler
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        Message msg = event.getChannel().sendMessage("Hello").complete();
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Audio and Music Bots
+
+<AccordionGroup>
+  <Accordion title="How do I make a music bot?">
+    JDA doesn't include audio playback - you need a separate library:
+
+    **Option 1: Lavaplayer (Local)**
+    ```gradle
+    dependencies {
+        implementation("net.dv8tion:JDA:6.3.1")
+        implementation("dev.arbjerg:lavaplayer:2.2.2")
+    }
+    ```
+
+    **Option 2: Lavalink (Distributed)**
+    - Better for large bots
+    - Runs on separate server
+    - Supports multiple bot instances
+    - See [Lavalink documentation](https://github.com/lavalink-devs/Lavalink)
+
+    **Recommended Resources:**
+    - [JDA Wiki: Making a Music Bot](https://jda.wiki/using-jda/making-a-music-bot/)
+    - [Lavaplayer GitHub](https://github.com/lavalink-devs/lavaplayer)
+  </Accordion>
+
+  <Accordion title="What is DAVE Protocol?">
+    DAVE (Discord Audio Voice Encryption) is Discord's end-to-end encryption protocol for voice.
+
+    To send audio with JDA, you need a library that implements DAVE:
+    - **Lavaplayer** - Most popular choice
+    - **LavaLink** - For distributed setups
+
+    See the [Making a Music Bot](https://jda.wiki/using-jda/making-a-music-bot/) guide for implementation.
+  </Accordion>
+
+  <Accordion title="Why is my audio stuttering?">
+    **Common causes:**
+
+    1. **Garbage Collection pauses** - Use udpqueue:
+    ```java
+    JDABuilder.createDefault(token)
+        .setAudioSendFactory(new NativeAudioSendFactory())
+        .build();
+    ```
+
+    2. **High CPU usage** - Optimize your bot code
+
+    3. **Network issues** - Check connection stability
+
+    4. **Improper audio buffer** - Ensure proper AudioSendHandler implementation
+
+    See [udpqueue](https://github.com/MinnDevelopment/udpqueue.rs) for GC-free audio sending.
+  </Accordion>
+</AccordionGroup>
+
+## Performance and Scaling
+
+<AccordionGroup>
+  <Accordion title="How do I reduce memory usage?">
+    **Use lighter cache configurations:**
+
+    ```java
+    // Minimal caching for slash command bots
+    JDABuilder.createLight(token)
+        .setEnabledCacheFlags(EnumSet.noneOf(CacheFlag.class))
+        .build();
+
+    // Selective caching
+    JDABuilder.createDefault(token)
+        .setMemberCachePolicy(MemberCachePolicy.VOICE)
+        .disableCache(
+            CacheFlag.ACTIVITY,
+            CacheFlag.CLIENT_STATUS,
+            CacheFlag.EMOJI,
+            CacheFlag.STICKER
+        )
+        .build();
+    ```
+
+    **Disable chunking for large bots:**
+    ```java
+    JDABuilder.createLight(token)
+        .setChunkingFilter(ChunkingFilter.NONE)
+        .build();
+    ```
+  </Accordion>
+
+  <Accordion title="When should I use sharding?">
+    **Use sharding when:**
+    - Your bot is in 2,500+ servers (Discord will require it)
+    - You need to distribute load across multiple processes
+    - You want better redundancy
+
+    **Implementation:**
+    ```java
+    DefaultShardManagerBuilder.createDefault(token)
+        .setShardsTotal(4) // Or -1 for automatic
+        .addEventListeners(new MyListener())
+        .build();
+    ```
+
+    For most bots under 2,500 servers, a single `JDA` instance is sufficient.
+  </Accordion>
+
+  <Accordion title="What are rate limits and how are they handled?">
+    Rate limits restrict how many requests you can make to Discord's API.
+
+    **JDA automatically:**
+    - Tracks rate limits per endpoint
+    - Queues requests when limits are reached
+    - Retries on 429 responses
+    - Respects global rate limits
+
+    **You should:**
+    - Use caching to avoid unnecessary API calls
+    - Batch operations when possible
+    - Avoid spamming requests in loops
+
+    ```java
+    // ❌ Bad - Makes 100 individual requests
+    for (int i = 0; i < 100; i++) {
+        channel.sendMessage("Message " + i).queue();
+    }
+
+    // ✅ Better - Batch with delays
+    for (int i = 0; i < 100; i++) {
+        int finalI = i;
+        channel.sendMessage("Message " + finalI)
+            .delay(i, TimeUnit.SECONDS)
+            .queue();
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Deployment and Production
+
+<AccordionGroup>
+  <Accordion title="How do I keep my bot running 24/7?">
+    **Options:**
+
+    1. **VPS (Virtual Private Server)**
+       - DigitalOcean, Linode, Vultr
+       - Run bot as systemd service or screen session
+
+    2. **Cloud Platforms**
+       - AWS EC2, Google Cloud Compute
+       - Heroku (free tier discontinued)
+       - Railway, Render
+
+    3. **Docker Container**
+       ```dockerfile
+       FROM eclipse-temurin:17-jre
+       COPY mybot.jar /app/bot.jar
+       CMD ["java", "-jar", "/app/bot.jar"]
+       ```
+
+    4. **Process Managers**
+       - PM2 (for Node.js wrappers)
+       - systemd (Linux)
+       - screen/tmux sessions
+  </Accordion>
+
+  <Accordion title="How do I secure my bot token?">
+    **Best practices:**
+
+    1. **Never commit tokens to Git:**
+    ```gitignore
+    # .gitignore
+    .env
+    config.properties
+    bot-token.txt
+    ```
+
+    2. **Use environment variables:**
+    ```java
+    String token = System.getenv("BOT_TOKEN");
+    if (token == null) {
+        throw new IllegalStateException("BOT_TOKEN not set!");
+    }
+    ```
+
+    3. **Use configuration files (gitignored):**
+    ```java
+    Properties config = new Properties();
+    config.load(new FileInputStream("config.properties"));
+    String token = config.getProperty("token");
+    ```
+
+    4. **Regenerate if exposed:**
+       - Go to Developer Portal immediately
+       - Regenerate bot token
+       - Update your bot configuration
+  </Accordion>
+
+  <Accordion title="How do I update my bot without downtime?">
+    **Strategies:**
+
+    1. **Graceful Shutdown:**
+    ```java
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        jda.shutdown();
+        try {
+            if (!jda.awaitShutdown(Duration.ofSeconds(10))) {
+                jda.shutdownNow();
+                jda.awaitShutdown();
+            }
+        } catch (InterruptedException e) {
+            jda.shutdownNow();
+        }
+    }));
+    ```
+
+    2. **Multiple Instances** (for large bots):
+       - Use sharding
+       - Update shards one at a time
+       - Requires stateless design or shared database
+
+    3. **Rolling Updates** (Docker/Kubernetes):
+       - Deploy new version alongside old
+       - Gradually shift traffic
+       - Rollback if issues occur
+  </Accordion>
+</AccordionGroup>
+
+## Still Have Questions?
+
+If you didn't find your answer here:
+
+- Check the [Common Issues](/troubleshooting/common-issues) page
+- Browse the [JDA Wiki](https://jda.wiki)
+- Search [GitHub Issues](https://github.com/discord-jda/JDA/issues)
+- Ask on the [JDA Discord Server](https://discord.gg/0hMr4ce0tIl3SLv5)
+
+<Card title="Join the Community" icon="discord" href="https://discord.gg/0hMr4ce0tIl3SLv5">
+  Get help from JDA developers and thousands of community members
+</Card>

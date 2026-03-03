@@ -1,80 +1,278 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Build your first Discord bot with JDA in minutes
 ---
 
-## Get started in three steps
+This guide will walk you through creating your first Discord bot using JDA. By the end, you'll have a working bot that responds to slash commands.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Install JDA">
+    Make sure you've [installed JDA](/installation) in your project using Gradle or Maven.
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Create a Discord Application">
+    You'll need to create a bot account in the [Discord Developer Portal](https://discord.com/developers/applications).
 
-### Step 2: Deploy your changes
+    1. Click "New Application" and give it a name
+    2. Navigate to the "Bot" section
+    3. Click "Add Bot"
+    4. Copy your bot token (keep this secret!)
+    5. Enable the required intents for your bot
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <Warning>
+    Never share your bot token publicly. It provides full access to your bot.
+    </Warning>
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Invite Your Bot">
+    Generate an invite link in the OAuth2 section:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    1. Go to OAuth2 > URL Generator
+    2. Select `bot` and `applications.commands` scopes
+    3. Select the required bot permissions
+    4. Copy the generated URL and open it in your browser
+    5. Select a server and authorize the bot
+  </Step>
+</Steps>
 
-### Step 3: Go live
+## Your First Bot: Slash Commands
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+Let's create a simple bot that responds to slash commands. This example uses no intents, making it lightweight and easy to start with.
 
-## Next steps
+<Steps>
+  <Step title="Create the Bot Class">
+    Create a new file `SlashBot.java`:
 
-Now that you have your docs running, explore these key features:
+    ```java SlashBot.java
+    import net.dv8tion.jda.api.JDA;
+    import net.dv8tion.jda.api.JDABuilder;
+    import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+    import net.dv8tion.jda.api.hooks.ListenerAdapter;
+    import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+    import net.dv8tion.jda.api.interactions.commands.build.Commands;
+    import net.dv8tion.jda.api.requests.GatewayIntent;
 
-<CardGroup cols={2}>
+    import java.util.EnumSet;
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+    import static net.dv8tion.jda.api.interactions.commands.OptionType.STRING;
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+    public class SlashBot extends ListenerAdapter {
+        public static void main(String[] args) {
+            // Slash commands don't need any intents
+            EnumSet<GatewayIntent> intents = EnumSet.noneOf(GatewayIntent.class);
+            
+            JDA jda = JDABuilder.createLight("YOUR_BOT_TOKEN", intents)
+                    .addEventListeners(new SlashBot())
+                    .build();
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+            // Register slash commands
+            jda.updateCommands().addCommands(
+                Commands.slash("say", "Makes the bot say what you tell it to")
+                    .addOption(STRING, "content", "What the bot should say", true)
+            ).queue();
+        }
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+        @Override
+        public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+            if (event.getName().equals("say")) {
+                String content = event.getOption("content", OptionMapping::getAsString);
+                event.reply(content).queue();
+            }
+        }
+    }
+    ```
 
-</CardGroup>
+    <Note>
+    Replace `YOUR_BOT_TOKEN` with your actual bot token from the Discord Developer Portal.
+    </Note>
+  </Step>
+
+  <Step title="Run Your Bot">
+    Compile and run your bot:
+
+    ```bash
+    javac -cp "path/to/JDA.jar" SlashBot.java
+    java -cp ".:path/to/JDA.jar" SlashBot
+    ```
+
+    If you're using an IDE, simply run the `main` method.
+  </Step>
+
+  <Step title="Test Your Bot">
+    In Discord, type `/say` and you should see your command appear. Enter some text and the bot will repeat it back to you!
+
+    <Tip>
+    If you don't see the command immediately, try reloading Discord (Ctrl+R on desktop).
+    </Tip>
+  </Step>
+</Steps>
+
+## Understanding the Code
+
+Let's break down what's happening:
+
+### JDABuilder
+
+```java
+JDA jda = JDABuilder.createLight("YOUR_BOT_TOKEN", intents)
+    .addEventListeners(new SlashBot())
+    .build();
+```
+
+- `createLight()` creates a lightweight JDA instance with minimal caching
+- `addEventListeners()` registers your event listener class
+- `build()` starts the bot and connects to Discord
+
+### Registering Commands
+
+```java
+jda.updateCommands().addCommands(
+    Commands.slash("say", "Makes the bot say what you tell it to")
+        .addOption(STRING, "content", "What the bot should say", true)
+).queue();
+```
+
+This registers a `/say` command with one required string parameter called `content`.
+
+### Handling Commands
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    if (event.getName().equals("say")) {
+        String content = event.getOption("content", OptionMapping::getAsString);
+        event.reply(content).queue();
+    }
+}
+```
+
+This method is called whenever someone uses a slash command. We check the command name and respond accordingly.
+
+## Example: Message Logger Bot
+
+For a more complex example, here's a bot that logs messages to the console:
+
+```java MessageLogger.java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+import java.util.EnumSet;
+
+public class MessageLogger extends ListenerAdapter {
+    public static void main(String[] args) {
+        // This bot needs the MESSAGE_CONTENT privileged intent
+        EnumSet<GatewayIntent> intents = EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.MESSAGE_CONTENT
+        );
+
+        JDABuilder.createLight("YOUR_BOT_TOKEN", intents)
+            .addEventListeners(new MessageLogger())
+            .build();
+    }
+
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        User author = event.getAuthor();
+        Message message = event.getMessage();
+        
+        if (event.isFromGuild()) {
+            System.out.printf("[%s] [%#s] %#s: %s\n",
+                event.getGuild().getName(),
+                event.getChannel(),
+                author,
+                message.getContentDisplay());
+        } else {
+            System.out.printf("[direct] %#s: %s\n", 
+                author, 
+                message.getContentDisplay());
+        }
+    }
+}
+```
+
+<Warning>
+The `MESSAGE_CONTENT` intent is privileged and must be explicitly enabled in your bot settings in the Discord Developer Portal.
+</Warning>
+
+## Gateway Intents
+
+Intents control what events your bot receives. For optimal performance, only enable the intents you need:
+
+- `GUILD_MESSAGES` - Receive message events in servers
+- `DIRECT_MESSAGES` - Receive direct message events  
+- `MESSAGE_CONTENT` - Access message content (privileged)
+- `GUILD_MEMBERS` - Access member information (privileged)
+- `GUILD_PRESENCES` - Access presence updates (privileged)
+
+<Tip>
+Read more about [Gateway Intents and Member Cache Policy](https://jda.wiki/using-jda/gateway-intents-and-member-cache-policy/) to understand how to configure your bot properly.
+</Tip>
+
+## RestAction and Queuing
+
+All API requests in JDA use the `RestAction` interface:
+
+```java
+channel.sendMessage("Hello!")
+    .queue(); // Sends the request asynchronously
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+You must call `queue()`, `submit()`, or `complete()` to execute the request. Without it, nothing happens!
 </Note>
+
+### RestAction Methods
+
+- `queue()` - Execute asynchronously (recommended)
+- `queue(success -> {...})` - Execute with a success callback
+- `submit()` - Returns a `CompletableFuture<T>`
+- `complete()` - Execute synchronously (blocking)
+
+### Chaining Actions
+
+```java
+event.reply("Processing...")
+    .flatMap(hook -> hook.editOriginal("Done!"))
+    .queue();
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="RestAction Guide"
+    icon="link"
+    href="https://jda.wiki/using-jda/using-restaction/"
+  >
+    Learn how to chain and combine API requests
+  </Card>
+  <Card
+    title="Interactions"
+    icon="hand-pointer"
+    href="https://jda.wiki/using-jda/interactions/"
+  >
+    Build buttons, select menus, and modals
+  </Card>
+  <Card
+    title="Event List"
+    icon="calendar"
+    href="https://jda.wiki/using-jda/events-list/"
+  >
+    Explore all available events
+  </Card>
+  <Card
+    title="Examples"
+    icon="code"
+    href="https://github.com/discord-jda/JDA/tree/master/src/examples/java"
+  >
+    Browse more code examples
+  </Card>
+</CardGroup>

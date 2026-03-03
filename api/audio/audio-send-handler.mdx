@@ -1,0 +1,197 @@
+---
+title: AudioSendHandler
+description: Interface for sending audio to Discord voice channels
+---
+
+The `AudioSendHandler` interface is used to provide audio data to JDA for transmission to Discord voice channels.
+
+<Note>
+  Audio transmission requires the DAVE (Discord Audio Video Encryption) protocol. See the [Discord documentation](https://discord.com/developers/docs/topics/voice-connections#dave-protocol) for details.
+</Note>
+
+## Audio Format
+
+JDA expects audio in the following format (unless using pre-encoded Opus):
+
+- **Sample Rate:** 48 KHz
+- **Bit Depth:** 16-bit
+- **Channels:** Stereo (2 channels)
+- **Encoding:** Signed BigEndian PCM
+
+This is defined by the constant:
+
+```java
+AudioFormat INPUT_FORMAT = new AudioFormat(48000f, 16, 2, true, true);
+```
+
+## Methods
+
+### canProvide
+
+Indicates whether audio data is available to send.
+
+```java
+boolean canProvide()
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` if audio data is ready to be provided
+</ResponseField>
+
+**Description:**
+- JDA calls this method before attempting to retrieve audio data
+- Return `true` to indicate audio is ready, `false` otherwise
+- This is checked each time JDA attempts to send audio
+- Can be used to dynamically start/stop audio transmission
+
+**Example:**
+
+```java
+@Override
+public boolean canProvide() {
+    // Return true if audio queue has data
+    return !audioQueue.isEmpty();
+}
+```
+
+### provide20MsAudio
+
+Provides 20 milliseconds of audio data.
+
+```java
+ByteBuffer provide20MsAudio()
+```
+
+<ResponseField name="returns" type="ByteBuffer">
+  A ByteBuffer containing 20ms of audio data, or `null` if no data available
+</ResponseField>
+
+**Requirements:**
+- Must return an **array-backed** ByteBuffer
+- Use `ByteBuffer.allocate(int)` or `ByteBuffer.wrap(byte[])`
+- Must contain exactly 20 milliseconds of audio
+- Audio format: 48KHz 16-bit stereo signed BigEndian PCM (unless `isOpus()` returns `true`)
+
+<Warning>
+  For best performance, load audio data beforehand or in parallel. Loading from disk when this method is called may cause latency issues.
+</Warning>
+
+**Example (PCM audio):**
+
+```java
+@Override
+public ByteBuffer provide20MsAudio() {
+    if (audioQueue.isEmpty()) {
+        return null;
+    }
+    
+    byte[] audioData = audioQueue.poll(); // 20ms of PCM audio
+    return ByteBuffer.wrap(audioData);
+}
+```
+
+**Example (pre-encoded Opus):**
+
+```java
+@Override
+public ByteBuffer provide20MsAudio() {
+    if (opusPackets.isEmpty()) {
+        return null;
+    }
+    
+    byte[] opusPacket = opusPackets.poll(); // Pre-encoded Opus packet
+    return ByteBuffer.wrap(opusPacket);
+}
+
+@Override
+public boolean isOpus() {
+    return true; // Indicate we're providing Opus
+}
+```
+
+### isOpus
+
+Indicates whether the audio data is pre-encoded in Opus format.
+
+```java
+default boolean isOpus() {
+    return false;
+}
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` if providing pre-encoded Opus audio, `false` for PCM (default)
+</ResponseField>
+
+**Description:**
+- Return `true` if `provide20MsAudio()` returns pre-encoded Opus packets
+- Return `false` (default) if providing raw PCM audio
+- When `true`, JDA will **not** encode the audio and will send it as-is to Discord
+
+## Implementation Example
+
+Here's a complete example of an AudioSendHandler:
+
+```java
+public class MyAudioSendHandler implements AudioSendHandler {
+    private final Queue<byte[]> audioQueue = new ConcurrentLinkedQueue<>();
+    
+    // Method to add audio data to the queue
+    public void queueAudio(byte[] audioData) {
+        audioQueue.offer(audioData);
+    }
+    
+    @Override
+    public boolean canProvide() {
+        return !audioQueue.isEmpty();
+    }
+    
+    @Override
+    public ByteBuffer provide20MsAudio() {
+        byte[] data = audioQueue.poll();
+        if (data == null) {
+            return null;
+        }
+        return ByteBuffer.wrap(data);
+    }
+    
+    @Override
+    public boolean isOpus() {
+        return false; // Providing PCM audio
+    }
+}
+```
+
+## Using with AudioManager
+
+```java
+// Create and register the handler
+MyAudioSendHandler sendHandler = new MyAudioSendHandler();
+AudioManager audioManager = guild.getAudioManager();
+audioManager.setSendingHandler(sendHandler);
+
+// Connect to a voice channel
+VoiceChannel channel = guild.getVoiceChannelById("123456789");
+audioManager.openAudioConnection(channel);
+
+// Queue audio data (in 20ms chunks)
+sendHandler.queueAudio(audio20msData);
+```
+
+## Recommended Implementation
+
+<Info>
+  JDA recommends using [LavaPlayer](https://github.com/lavalink-devs/lavaplayer) as your AudioSendHandler implementation. It provides a complete audio playback system with support for various audio sources.
+  
+  See the [LavaPlayer JDA demo](https://github.com/lavalink-devs/lavaplayer/tree/main/demo-jda) for integration examples.
+</Info>
+
+## Audio Data Size
+
+For 20ms of PCM audio at 48KHz 16-bit stereo:
+- Sample rate: 48,000 samples per second
+- Duration: 20ms = 0.02 seconds
+- Samples for 20ms: 48,000 × 0.02 = 960 samples
+- Channels: 2 (stereo)
+- Bytes per sample: 2 (16-bit)
+- **Total bytes: 960 × 2 × 2 = 3,840 bytes**

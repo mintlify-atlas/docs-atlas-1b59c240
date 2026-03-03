@@ -1,0 +1,476 @@
+---
+title: Threading Configuration
+description: Configure and optimize JDA's thread pools for different workloads
+---
+
+JDA uses multiple thread pools for different operations. Understanding and configuring these pools properly can significantly improve your bot's performance and resource usage.
+
+## Thread Pools Overview
+
+JDA uses six main thread pools:
+
+<ParamField path="Rate Limit Scheduler" type="ScheduledExecutorService">
+  Handles rate-limit delays and scheduled RestAction executions. Default: 2 threads.
+</ParamField>
+
+<ParamField path="Rate Limit Elastic" type="ExecutorService">
+  Executes blocking HTTP requests. Default: cached thread pool (scales dynamically).
+</ParamField>
+
+<ParamField path="Gateway Pool" type="ScheduledExecutorService">
+  Manages WebSocket workers for the main gateway connection. Default: 1 thread.
+</ParamField>
+
+<ParamField path="Callback Pool" type="ExecutorService">
+  Handles RestAction callbacks. Default: ForkJoinPool.commonPool().
+</ParamField>
+
+<ParamField path="Event Pool" type="ExecutorService">
+  Dispatches events to listeners. Default: calling thread (synchronous).
+</ParamField>
+
+<ParamField path="Audio Pool" type="ScheduledExecutorService">
+  Manages audio WebSocket connections. Default: 1 thread.
+</ParamField>
+
+## Rate Limit Scheduler
+
+Handles timing for rate-limited requests:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+
+public class RateLimitSchedulerExample {
+    public void configure(String token) {
+        // Create custom scheduler with 4 threads
+        ScheduledExecutorService scheduler = 
+            new ScheduledThreadPoolExecutor(
+                4,
+                new ThreadFactory() {
+                    private int count = 0;
+                    
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        Thread thread = new Thread(r);
+                        thread.setName("RateLimit-Scheduler-" + count++);
+                        thread.setDaemon(true);
+                        return thread;
+                    }
+                }
+            );
+        
+        JDABuilder.createDefault(token)
+            // JDA will automatically shut down this pool
+            .setRateLimitScheduler(scheduler, true)
+            .build();
+    }
+}
+```
+
+### When to Increase Threads
+
+- High-volume bots making many concurrent API requests
+- Bots using `queueAfter()` or `submitAfter()` frequently
+- Multiple shards on the same JVM
+
+## Rate Limit Elastic Pool
+
+Executes the actual HTTP requests:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+
+public class RateLimitElasticExample {
+    public void configure(String token) {
+        // Fixed thread pool for predictable resource usage
+        ExecutorService elastic = Executors.newFixedThreadPool(
+            20,
+            new ThreadFactory() {
+                private int count = 0;
+                
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r);
+                    thread.setName("RateLimit-Worker-" + count++);
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            }
+        );
+        
+        JDABuilder.createDefault(token)
+            .setRateLimitElastic(elastic, true)
+            .build();
+    }
+}
+```
+
+<Warning>
+  The default cached thread pool can create unlimited threads. For bots with high request volumes, consider using a fixed-size pool to prevent thread exhaustion.
+</Warning>
+
+## Gateway Pool
+
+Manages WebSocket communication with Discord:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+
+public class GatewayPoolExample {
+    public void configure(String token) {
+        // For most bots, 1 thread is sufficient
+        ScheduledExecutorService gatewayPool = 
+            Executors.newScheduledThreadPool(1);
+        
+        JDABuilder.createDefault(token)
+            .setGatewayPool(gatewayPool, true)
+            .build();
+    }
+}
+```
+
+### Gateway Pool Usage
+
+The gateway pool handles:
+- Voice state updates (connecting/disconnecting from channels)
+- Presence updates (changing activity or online status)
+- Guild member chunk requests
+- Heartbeat messages (keepalive)
+
+## Callback Pool
+
+Executes RestAction success and failure callbacks:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+
+public class CallbackPoolExample {
+    public void configure(String token) {
+        // Custom thread pool for callbacks
+        ExecutorService callbackPool = Executors.newFixedThreadPool(
+            10,
+            runnable -> {
+                Thread thread = new Thread(runnable);
+                thread.setName("Callback-Worker");
+                thread.setDaemon(true);
+                return thread;
+            }
+        );
+        
+        JDABuilder.createDefault(token)
+            .setCallbackPool(callbackPool, true)
+            .build();
+    }
+}
+```
+
+### Default: ForkJoinPool
+
+By default, JDA uses the common ForkJoinPool:
+
+```java
+// Default behavior (no configuration needed)
+JDABuilder.createDefault(token).build();
+
+// Callbacks execute on ForkJoinPool.commonPool()
+channel.sendMessage("Hello!")
+    .queue(message -> {
+        // This runs on ForkJoinPool.commonPool()
+        System.out.println("Message sent!");
+    });
+```
+
+## Event Pool
+
+Dispatches events to your listeners:
+
+### Synchronous (Default)
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+
+public class SyncEventsExample {
+    public void configure(String token) {
+        // Events are handled on the calling thread (default)
+        JDABuilder.createDefault(token)
+            .setEventPool(null) // null = synchronous
+            .build();
+    }
+}
+```
+
+### Asynchronous
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+
+public class AsyncEventsExample {
+    public void configure(String token) {
+        // Handle events asynchronously
+        ExecutorService eventPool = Executors.newFixedThreadPool(
+            4,
+            runnable -> {
+                Thread thread = new Thread(runnable);
+                thread.setName("Event-Handler");
+                thread.setDaemon(false); // Keep JVM alive
+                return thread;
+            }
+        );
+        
+        JDABuilder.createDefault(token)
+            .setEventPool(eventPool, true)
+            .build();
+    }
+}
+```
+
+<Warning>
+  Using an event pool means events may be handled out of order. If event order matters for your application, use synchronous event handling (default).
+</Warning>
+
+## Audio Pool
+
+Manages audio WebSocket connections:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+
+public class AudioPoolExample {
+    public void configure(String token) {
+        // Dedicated pool for audio operations
+        ScheduledExecutorService audioPool = 
+            Executors.newScheduledThreadPool(
+                2, // Increase if managing many voice connections
+                runnable -> {
+                    Thread thread = new Thread(runnable);
+                    thread.setName("Audio-WebSocket");
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            );
+        
+        JDABuilder.createDefault(token)
+            .setAudioPool(audioPool, true)
+            .build();
+    }
+}
+```
+
+## Complete Configuration Example
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class CompleteThreadingExample {
+    public void configure(String token) {
+        // Rate limit scheduler
+        ScheduledExecutorService rateLimitScheduler = 
+            createScheduledPool("RateLimit-Scheduler", 4);
+        
+        // Rate limit elastic pool
+        ExecutorService rateLimitElastic = 
+            createFixedPool("RateLimit-Worker", 20);
+        
+        // Gateway pool
+        ScheduledExecutorService gatewayPool = 
+            createScheduledPool("Gateway-Worker", 1);
+        
+        // Callback pool
+        ExecutorService callbackPool = 
+            createFixedPool("Callback-Worker", 10);
+        
+        // Event pool (async)
+        ExecutorService eventPool = 
+            createFixedPool("Event-Handler", 4);
+        
+        // Audio pool
+        ScheduledExecutorService audioPool = 
+            createScheduledPool("Audio-WebSocket", 2);
+        
+        JDABuilder.createDefault(token)
+            .setRateLimitScheduler(rateLimitScheduler, true)
+            .setRateLimitElastic(rateLimitElastic, true)
+            .setGatewayPool(gatewayPool, true)
+            .setCallbackPool(callbackPool, true)
+            .setEventPool(eventPool, true)
+            .setAudioPool(audioPool, true)
+            .build();
+    }
+    
+    private ScheduledExecutorService createScheduledPool(String name, int threads) {
+        return new ScheduledThreadPoolExecutor(
+            threads,
+            createThreadFactory(name)
+        );
+    }
+    
+    private ExecutorService createFixedPool(String name, int threads) {
+        return Executors.newFixedThreadPool(
+            threads,
+            createThreadFactory(name)
+        );
+    }
+    
+    private ThreadFactory createThreadFactory(String name) {
+        return new ThreadFactory() {
+            private final AtomicInteger count = new AtomicInteger(0);
+            
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread thread = new Thread(r);
+                thread.setName(name + "-" + count.getAndIncrement());
+                thread.setDaemon(true);
+                return thread;
+            }
+        };
+    }
+}
+```
+
+## Shared Thread Pools
+
+For multiple JDA instances (sharding), share thread pools:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+
+public class SharedPoolExample {
+    public void createShards(String token, int shardCount) {
+        // Shared pools for all shards
+        ScheduledExecutorService sharedScheduler = 
+            Executors.newScheduledThreadPool(4 * shardCount);
+        ExecutorService sharedElastic = 
+            Executors.newCachedThreadPool();
+        ExecutorService sharedCallback = 
+            Executors.newWorkStealingPool();
+        
+        for (int i = 0; i < shardCount; i++) {
+            JDABuilder.createDefault(token)
+                .useSharding(i, shardCount)
+                // Share pools across shards
+                .setRateLimitScheduler(sharedScheduler, false)
+                .setRateLimitElastic(sharedElastic, false)
+                .setCallbackPool(sharedCallback, false)
+                .build();
+        }
+        
+        // Manually shut down shared pools when done
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            sharedScheduler.shutdown();
+            sharedElastic.shutdown();
+            sharedCallback.shutdown();
+        }));
+    }
+}
+```
+
+## Automatic Shutdown
+
+Control whether JDA shuts down thread pools:
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import java.util.concurrent.*;
+
+public class ShutdownExample {
+    public void configure(String token) {
+        ExecutorService externalPool = Executors.newCachedThreadPool();
+        
+        JDA jda = JDABuilder.createDefault(token)
+            // false = don't shut down on JDA.shutdown()
+            .setRateLimitElastic(externalPool, false)
+            .build();
+        
+        // Later, manually manage shutdown
+        jda.shutdown();
+        externalPool.shutdown();
+    }
+}
+```
+
+## Performance Tuning
+
+### High-Volume Bots
+
+```java
+public class HighVolumeConfig {
+    public void configure(String token) {
+        JDABuilder.createDefault(token)
+            // More threads for rate limiting
+            .setRateLimitScheduler(
+                Executors.newScheduledThreadPool(8), true
+            )
+            // Large elastic pool
+            .setRateLimitElastic(
+                Executors.newFixedThreadPool(50), true
+            )
+            // Async event handling
+            .setEventPool(
+                Executors.newFixedThreadPool(8), true
+            )
+            .build();
+    }
+}
+```
+
+### Low-Resource Bots
+
+```java
+public class LowResourceConfig {
+    public void configure(String token) {
+        // Share a single pool for multiple purposes
+        ScheduledExecutorService sharedPool = 
+            Executors.newScheduledThreadPool(2);
+        
+        JDABuilder.createDefault(token)
+            .setRateLimitScheduler(sharedPool, false)
+            .setGatewayPool(sharedPool, false)
+            .setAudioPool(sharedPool, true) // Shut down with JDA
+            .build();
+    }
+}
+```
+
+## Monitoring Threads
+
+Track thread pool usage:
+
+```java
+import java.util.concurrent.*;
+
+public class MonitoringExample {
+    public void monitor() {
+        ThreadPoolExecutor pool = (ThreadPoolExecutor) 
+            Executors.newFixedThreadPool(10);
+        
+        // Periodically check pool stats
+        ScheduledExecutorService monitor = 
+            Executors.newSingleThreadScheduledExecutor();
+        
+        monitor.scheduleAtFixedRate(() -> {
+            System.out.println("Active threads: " + pool.getActiveCount());
+            System.out.println("Pool size: " + pool.getPoolSize());
+            System.out.println("Queue size: " + pool.getQueue().size());
+        }, 0, 5, TimeUnit.SECONDS);
+    }
+}
+```
+
+## Best Practices
+
+1. **Name your threads**: Use descriptive thread names for easier debugging
+2. **Use daemon threads**: Set threads as daemon to prevent blocking JVM shutdown
+3. **Share pools when sharding**: Avoid creating duplicate pools for each shard
+4. **Monitor resource usage**: Track thread pool metrics in production
+5. **Tune based on workload**: Adjust pool sizes based on your bot's actual usage patterns
+6. **Handle shutdown properly**: Ensure thread pools are cleaned up when your bot stops

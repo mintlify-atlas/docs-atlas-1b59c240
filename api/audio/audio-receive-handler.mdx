@@ -1,0 +1,318 @@
+---
+title: AudioReceiveHandler
+description: Interface for receiving audio from Discord voice channels
+---
+
+The `AudioReceiveHandler` interface is used to receive and process audio data from Discord voice channels.
+
+<Warning>
+  Audio receiving requires Discord's DAVE (Discord Audio Video Encryption) protocol. This feature requires special access and may have limited availability. See the [Discord documentation](https://discord.com/developers/docs/topics/voice-connections#dave-protocol) for more information.
+</Warning>
+
+## Audio Format
+
+JDA provides received audio in the following format:
+
+- **Sample Rate:** 48 KHz
+- **Bit Depth:** 16-bit
+- **Channels:** Stereo (2 channels)
+- **Encoding:** Signed BigEndian PCM
+
+This is defined by the constant:
+
+```java
+AudioFormat OUTPUT_FORMAT = new AudioFormat(48000.0f, 16, 2, true, true);
+```
+
+## Receive Modes
+
+The handler supports three modes of receiving audio:
+
+1. **Combined Audio** - All users mixed into a single stream
+2. **User Audio** - Individual user audio streams
+3. **Encoded Audio** - Raw Opus packets from users
+
+## Methods
+
+### canReceiveCombined
+
+Enables receiving combined audio from all users.
+
+```java
+default boolean canReceiveCombined() {
+    return false;
+}
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` to enable combined audio reception (default: `false`)
+</ResponseField>
+
+<Warning>
+  Only enable if you specifically need combined audio, as combining audio is computationally expensive.
+</Warning>
+
+### handleCombinedAudio
+
+Receives combined audio from all users every 20ms.
+
+```java
+default void handleCombinedAudio(CombinedAudio combinedAudio) {}
+```
+
+<ParamField path="combinedAudio" type="CombinedAudio" required>
+  Combined audio data from all speaking users
+</ParamField>
+
+**Description:**
+- Called every 20 milliseconds when `canReceiveCombined()` returns `true`
+- Receives audio mixed from all users
+- Called even during silence (with empty user list)
+- Maintains timeline with no gaps in audio
+- Ideal for audio recording
+
+**Example:**
+
+```java
+@Override
+public boolean canReceiveCombined() {
+    return true;
+}
+
+@Override
+public void handleCombinedAudio(CombinedAudio combinedAudio) {
+    byte[] audioData = combinedAudio.getAudioData(1.0);
+    List<User> speakers = combinedAudio.getUsers();
+    
+    // Record or process combined audio
+    audioRecorder.write(audioData);
+}
+```
+
+### canReceiveUser
+
+Enables receiving individual user audio streams.
+
+```java
+default boolean canReceiveUser() {
+    return false;
+}
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` to enable user-specific audio reception (default: `false`)
+</ResponseField>
+
+### handleUserAudio
+
+Receives audio from individual users when they speak.
+
+```java
+default void handleUserAudio(UserAudio userAudio) {}
+```
+
+<ParamField path="userAudio" type="UserAudio" required>
+  Audio data from a specific user
+</ParamField>
+
+**Description:**
+- Called when `canReceiveUser()` returns `true`
+- Only fires when a user is speaking (not on a fixed schedule)
+- Contains audio from a single user
+- Useful for voice recognition, user-specific recording, or custom mixing
+
+**Example:**
+
+```java
+@Override
+public boolean canReceiveUser() {
+    return true;
+}
+
+@Override
+public void handleUserAudio(UserAudio userAudio) {
+    User user = userAudio.getUser();
+    byte[] audioData = userAudio.getAudioData(1.0);
+    
+    // Process user-specific audio
+    voiceRecognition.process(user, audioData);
+}
+```
+
+### canReceiveEncoded
+
+Enables receiving raw Opus-encoded packets.
+
+```java
+default boolean canReceiveEncoded() {
+    return false;
+}
+```
+
+<ResponseField name="returns" type="boolean">
+  `true` to enable raw Opus packet reception (default: `false`)
+</ResponseField>
+
+### handleEncodedAudio
+
+Receives raw Opus packets from users every 20ms.
+
+```java
+default void handleEncodedAudio(OpusPacket packet) {}
+```
+
+<ParamField path="packet" type="OpusPacket" required>
+  Raw Opus-encoded audio packet
+</ParamField>
+
+**Description:**
+- Called every 20 milliseconds when `canReceiveEncoded()` returns `true`
+- Provides raw Opus packets from individual users
+- Not combined audio - each user sends their own stream
+- Useful for lazy decoding or custom audio processing
+- Can be used with other receive modes simultaneously
+
+**Example:**
+
+```java
+@Override
+public boolean canReceiveEncoded() {
+    return true;
+}
+
+@Override
+public void handleEncodedAudio(OpusPacket packet) {
+    long userId = packet.getUserId();
+    int ssrc = packet.getSSRC();
+    byte[] opusAudio = packet.getOpusAudio();
+    
+    // Store or process raw Opus data
+    opusStorage.save(userId, opusAudio);
+    
+    // Or decode lazily when needed
+    byte[] pcmAudio = packet.getAudioData(1.0);
+}
+```
+
+### includeUserInCombinedAudio
+
+Filters which users to include in combined audio.
+
+```java
+default boolean includeUserInCombinedAudio(User user) {
+    return true;
+}
+```
+
+<ParamField path="user" type="User" required>
+  The user whose audio was received
+</ParamField>
+
+<ResponseField name="returns" type="boolean">
+  `true` to include this user in combined audio (default: `true`)
+</ResponseField>
+
+**Description:**
+- Used as a filter for combined audio generation
+- Only affects `handleCombinedAudio()`, not other receive modes
+- Useful for whitelisting/blacklisting users
+
+**Example:**
+
+```java
+@Override
+public boolean includeUserInCombinedAudio(User user) {
+    // Exclude bots from combined audio
+    if (user.isBot()) {
+        return false;
+    }
+    
+    // Check against blacklist
+    return !blacklistedUsers.contains(user.getIdLong());
+}
+```
+
+## Implementation Example
+
+Here's a complete example combining multiple receive modes:
+
+```java
+public class MyAudioReceiveHandler implements AudioReceiveHandler {
+    private final AudioRecorder recorder = new AudioRecorder();
+    private final Map<Long, UserAudioProcessor> userProcessors = new HashMap<>();
+    
+    @Override
+    public boolean canReceiveCombined() {
+        return true; // Enable combined audio for recording
+    }
+    
+    @Override
+    public boolean canReceiveUser() {
+        return true; // Enable user audio for individual processing
+    }
+    
+    @Override
+    public void handleCombinedAudio(CombinedAudio combinedAudio) {
+        // Record all audio to a single file
+        byte[] audioData = combinedAudio.getAudioData(1.0);
+        recorder.write(audioData);
+    }
+    
+    @Override
+    public void handleUserAudio(UserAudio userAudio) {
+        // Process each user's audio individually
+        User user = userAudio.getUser();
+        byte[] audioData = userAudio.getAudioData(1.0);
+        
+        UserAudioProcessor processor = userProcessors.computeIfAbsent(
+            user.getIdLong(),
+            id -> new UserAudioProcessor(user)
+        );
+        processor.processAudio(audioData);
+    }
+    
+    @Override
+    public boolean includeUserInCombinedAudio(User user) {
+        // Exclude bots from combined recording
+        return !user.isBot();
+    }
+}
+```
+
+## Using with AudioManager
+
+```java
+// Create and register the handler
+MyAudioReceiveHandler receiveHandler = new MyAudioReceiveHandler();
+AudioManager audioManager = guild.getAudioManager();
+audioManager.setReceivingHandler(receiveHandler);
+
+// Connect to a voice channel
+VoiceChannel channel = guild.getVoiceChannelById("123456789");
+audioManager.openAudioConnection(channel);
+
+// Audio will now be received via the handler methods
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose the Right Mode">
+    - Use **Combined Audio** for recording all participants
+    - Use **User Audio** for voice recognition or user-specific features
+    - Use **Encoded Audio** for custom processing or storage optimization
+  </Accordion>
+  
+  <Accordion title="Performance Considerations">
+    - Only enable modes you actually need
+    - Combined audio is expensive - disable if not required
+    - Process audio on separate threads to avoid blocking
+    - Be mindful of memory usage when storing audio data
+  </Accordion>
+  
+  <Accordion title="Audio Timeline">
+    - Combined audio maintains a continuous timeline (no gaps)
+    - User audio only fires when users speak (sporadic)
+    - Encoded audio fires every 20ms per speaking user
+  </Accordion>
+</AccordionGroup>

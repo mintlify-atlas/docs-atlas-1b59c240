@@ -1,0 +1,337 @@
+---
+title: Member Cache Policy
+description: Configure advanced member caching strategies to optimize memory usage
+---
+
+Member caching policies control which members are kept in JDA's cache. Proper configuration can significantly reduce memory usage while maintaining the functionality your bot needs.
+
+## Built-in Policies
+
+JDA provides several predefined member cache policies:
+
+### Basic Policies
+
+<ParamField path="MemberCachePolicy.NONE" type="MemberCachePolicy">
+  Disables all member caching. Use this for minimal memory footprint.
+</ParamField>
+
+<ParamField path="MemberCachePolicy.ALL" type="MemberCachePolicy">
+  Caches all members. Requires `GUILD_MEMBERS` intent for proper cleanup.
+</ParamField>
+
+<ParamField path="MemberCachePolicy.OWNER" type="MemberCachePolicy">
+  Only caches guild owners.
+</ParamField>
+
+<ParamField path="MemberCachePolicy.DEFAULT" type="MemberCachePolicy">
+  Default policy: equivalent to `VOICE.or(OWNER)`. Caches voice channel members and guild owners.
+</ParamField>
+
+### Conditional Policies
+
+<ParamField path="MemberCachePolicy.VOICE" type="MemberCachePolicy">
+  Caches members connected to voice channels. Requires `GUILD_VOICE_STATES` intent and `VOICE_STATE` cache flag.
+</ParamField>
+
+<ParamField path="MemberCachePolicy.ONLINE" type="MemberCachePolicy">
+  Caches online/idle/dnd members. Requires `GUILD_PRESENCES` intent and `ONLINE_STATUS` cache flag.
+</ParamField>
+
+<ParamField path="MemberCachePolicy.BOOSTER" type="MemberCachePolicy">
+  Caches members who are boosting the guild. Requires `GUILD_MEMBERS` intent.
+</ParamField>
+
+<ParamField path="MemberCachePolicy.PENDING" type="MemberCachePolicy">
+  Caches members who haven't passed Membership Screening. Requires `GUILD_MEMBERS` intent.
+</ParamField>
+
+## Combining Policies
+
+You can combine policies using logical operations:
+
+### OR Operation
+
+Cache members matching ANY condition:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+public class OrPolicyExample {
+    public void configure() {
+        JDABuilder.createDefault(token)
+            // Cache members in voice OR guild owners
+            .setMemberCachePolicy(
+                MemberCachePolicy.VOICE.or(MemberCachePolicy.OWNER)
+            )
+            .build();
+    }
+}
+```
+
+### AND Operation
+
+Cache members matching ALL conditions:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+public class AndPolicyExample {
+    public void configure() {
+        JDABuilder.createDefault(token)
+            // Cache members who are BOTH online AND in voice
+            .setMemberCachePolicy(
+                MemberCachePolicy.VOICE.and(MemberCachePolicy.ONLINE)
+            )
+            .build();
+    }
+}
+```
+
+### Complex Policies
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+public class ComplexPolicyExample {
+    public void configure() {
+        MemberCachePolicy policy = MemberCachePolicy.VOICE  // Cache voice members
+            .or(MemberCachePolicy.OWNER)                    // OR guild owners
+            .or(MemberCachePolicy.BOOSTER);                 // OR boosters
+        
+        JDABuilder.createDefault(token)
+            .setMemberCachePolicy(policy)
+            .build();
+    }
+}
+```
+
+## LRU Cache Policy
+
+The LRU (Least Recently Used) policy limits the cache size and evicts inactive members:
+
+<ParamField path="maxSize" type="int" required>
+  The maximum number of members to keep in cache.
+</ParamField>
+
+### Basic LRU Example
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+public class LruExample {
+    public void configure() {
+        JDABuilder.createDefault(token)
+            // Keep only the 1000 most recently active members
+            .setMemberCachePolicy(MemberCachePolicy.lru(1000))
+            .build();
+    }
+}
+```
+
+### Advanced LRU with Conditions
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+public class AdvancedLruExample {
+    public void configure() {
+        MemberCachePolicy policy = MemberCachePolicy.ONLINE  // Only cache online members
+            .and(MemberCachePolicy.lru(1000)                 // Track 1000 most active
+                .unloadUnless(MemberCachePolicy.VOICE));     // Keep voice members regardless
+        
+        JDABuilder.createDefault(token)
+            .setMemberCachePolicy(policy)
+            .build();
+    }
+}
+```
+
+<Warning>
+  The LRU policy itself always returns `true` for `cacheMember()`, making accessed members the "most recently used." Use the `.unloadUnless()` method to specify members that should never be evicted.
+</Warning>
+
+## Custom Cache Policy
+
+Implement custom logic by creating your own policy:
+
+```java
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+public class CustomCachePolicyExample {
+    public MemberCachePolicy createCustomPolicy() {
+        return (member) -> {
+            // Cache members with specific roles
+            return member.getRoles().stream()
+                .anyMatch(role -> role.getName().equals("Moderator"));
+        };
+    }
+    
+    public MemberCachePolicy createActivityPolicy() {
+        return (member) -> {
+            // Cache members playing a specific game
+            return member.getActivities().stream()
+                .anyMatch(activity -> 
+                    activity.getName().equals("Minecraft")
+                );
+        };
+    }
+}
+```
+
+## Policy Composition Helpers
+
+Use static methods for complex compositions:
+
+### ANY Policy
+
+Cache if ANY condition matches:
+
+```java
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+public class AnyPolicyExample {
+    public MemberCachePolicy createPolicy() {
+        return MemberCachePolicy.any(
+            MemberCachePolicy.VOICE,
+            MemberCachePolicy.OWNER,
+            MemberCachePolicy.BOOSTER
+        );
+    }
+}
+```
+
+### ALL Policy
+
+Cache only if ALL conditions match:
+
+```java
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+public class AllPolicyExample {
+    public MemberCachePolicy createPolicy() {
+        return MemberCachePolicy.all(
+            MemberCachePolicy.ONLINE,
+            MemberCachePolicy.BOOSTER
+        );
+    }
+}
+```
+
+## Intent Requirements
+
+Different policies require specific gateway intents:
+
+| Policy | Required Intent | Required Cache Flag |
+|--------|----------------|---------------------|
+| `ONLINE` | `GUILD_PRESENCES` | `ONLINE_STATUS` |
+| `VOICE` | `GUILD_VOICE_STATES` | `VOICE_STATE` |
+| `BOOSTER` | `GUILD_MEMBERS` | - |
+| `PENDING` | `GUILD_MEMBERS` | - |
+| `ALL` | `GUILD_MEMBERS` (recommended) | - |
+
+<Warning>
+  Using `MemberCachePolicy.ALL` or `MemberCachePolicy.ONLINE` without the `GUILD_MEMBERS` intent is not recommended. Without this intent, Discord won't send member leave events, causing members to stay in cache indefinitely.
+</Warning>
+
+## Manual Cache Management
+
+You can manually prune the cache based on your policy:
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
+
+public class CacheManagementExample {
+    public void pruneCache(JDA jda) {
+        for (Guild guild : jda.getGuilds()) {
+            // Remove members that don't match the policy
+            guild.pruneMemberCache();
+        }
+    }
+    
+    public void unloadSpecificMember(Guild guild, long userId) {
+        // Manually unload a specific member
+        guild.unloadMember(userId);
+    }
+}
+```
+
+## Memory Optimization Examples
+
+### Minimal Memory Bot
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+public class MinimalBot {
+    public void build(String token) {
+        JDABuilder.createLight(token)
+            .setMemberCachePolicy(MemberCachePolicy.NONE)
+            .disableCache(CacheFlag.ACTIVITY, CacheFlag.VOICE_STATE)
+            .build();
+    }
+}
+```
+
+### Music Bot Configuration
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+public class MusicBot {
+    public void build(String token) {
+        JDABuilder.createDefault(token)
+            // Only cache voice members and owners
+            .setMemberCachePolicy(
+                MemberCachePolicy.VOICE.or(MemberCachePolicy.OWNER)
+            )
+            .enableIntents(GatewayIntent.GUILD_VOICE_STATES)
+            .build();
+    }
+}
+```
+
+### Moderation Bot Configuration
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+public class ModerationBot {
+    public void build(String token) {
+        JDABuilder.createDefault(token)
+            // Keep online members with LRU limit
+            .setMemberCachePolicy(
+                MemberCachePolicy.ONLINE
+                    .and(MemberCachePolicy.lru(5000)
+                        .unloadUnless(MemberCachePolicy.OWNER))
+            )
+            .enableIntents(
+                GatewayIntent.GUILD_MEMBERS,
+                GatewayIntent.GUILD_PRESENCES
+            )
+            .build();
+    }
+}
+```
+
+## Best Practices
+
+1. **Match intent to policy**: Ensure you enable the required gateway intents for your chosen policy
+2. **Use LRU for large bots**: Limit memory usage in large guilds with LRU caching
+3. **Enable GUILD_MEMBERS for cleanup**: This intent is needed for proper member leave event handling
+4. **Combine policies efficiently**: Use `.or()` for inclusive caching, `.and()` for restrictive caching
+5. **Test memory usage**: Monitor your bot's memory consumption and adjust policies accordingly
+6. **Document your policy**: Clear documentation helps when debugging cache-related issues

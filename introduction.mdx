@@ -1,0 +1,108 @@
+---
+title: Introduction to JDA
+description: Welcome to JDA (Java Discord API) - the powerful Java library for building Discord bots
+---
+
+## Welcome to JDA
+
+JDA (Java Discord API) is an open source library for implementing bots on Discord using the real-time gateway and REST API. It provides event-based functionality to implement bots of any kind, allowing for effective and scalable applications.
+
+<CardGroup cols={2}>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Get started with JDA using Gradle or Maven
+  </Card>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Build your first Discord bot in minutes
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="https://docs.jda.wiki/"
+  >
+    Explore the complete JDA Javadocs
+  </Card>
+  <Card
+    title="Wiki"
+    icon="book"
+    href="https://jda.wiki/"
+  >
+    Deep dive into JDA concepts and guides
+  </Card>
+</CardGroup>
+
+## Core Concepts
+
+JDA has been developed with scalability and ease of use in mind, providing three core concepts:
+
+### Event System
+
+Providing simplified events from the gateway API, to respond to any platform events in real-time without much hassle.
+
+```java
+public class MyListener extends ListenerAdapter {
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (event.getMessage().getContentRaw().equals("!ping")) {
+            event.getChannel().sendMessage("Pong!").queue();
+        }
+    }
+}
+```
+
+### Rest Actions
+
+Easy to use and scalable implementation of REST API functionality, letting you choose between callbacks with combinators, futures, and blocking. The library also handles rate-limits imposed by Discord automatically.
+
+```java
+channel.sendMessage("Hello Friend!")
+    .addFiles(FileUpload.fromData(greetImage))
+    .queue() // Send the request asynchronously
+```
+
+<Note>
+The final call to `queue()` sends the request. You can also send requests synchronously or using futures.
+</Note>
+
+### Customizable Cache
+
+Trading memory usage for better performance where necessary, with sane default presets to choose from and customize.
+
+JDA provides different builder presets:
+- `createDefault` - Enables cache for users who are active in voice channels and all cache flags
+- `createLight` - Disables all user cache and cache flags
+- `create` - Enables member chunking, caches all users, and enables all cache flags
+
+<Tip>
+Read the guide on [caching and intents](https://jda.wiki/using-jda/gateway-intents-and-member-cache-policy/) to configure your bot properly.
+</Tip>
+
+## Requirements
+
+The minimum Java version supported by JDA is **Java SE 8**. JDA also uses JSR 305 to support solid interoperability with Kotlin out of the box.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Install JDA"
+    icon="download"
+    href="/installation"
+  >
+    Add JDA to your project with Gradle or Maven
+  </Card>
+  <Card
+    title="Build Your First Bot"
+    icon="robot"
+    href="/quickstart"
+  >
+    Follow our quick start guide to create a working bot
+  </Card>
+</CardGroup>

@@ -1,0 +1,267 @@
+---
+title: Caching
+description: Configure JDA's caching behavior to balance memory usage and performance
+---
+
+## Overview
+
+JDA caches Discord entities (guilds, members, channels, messages, etc.) to improve performance and reduce API calls. You can configure what gets cached to balance memory usage and functionality.
+
+## Cache Flags
+
+Cache flags control what types of data JDA caches. Each flag can be enabled or disabled:
+
+```java
+JDABuilder.createDefault(token)
+    .enableCache(CacheFlag.VOICE_STATE, CacheFlag.EMOJI)
+    .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+    .build();
+```
+
+### Available Cache Flags
+
+| Flag | Description | Required Intent |
+|------|-------------|----------------|
+| `ACTIVITY` | User activities ("Playing...") | `GUILD_PRESENCES` |
+| `VOICE_STATE` | Voice channel states | `GUILD_VOICE_STATES` |
+| `EMOJI` | Custom emojis | `GUILD_EXPRESSIONS` |
+| `STICKER` | Custom stickers | `GUILD_EXPRESSIONS` |
+| `CLIENT_STATUS` | Online on mobile/desktop/web | `GUILD_PRESENCES` |
+| `MEMBER_OVERRIDES` | Permission overwrites per member | `GUILD_MEMBERS` |
+| `ROLE_TAGS` | Role tags (bot role, boost role, etc.) | None |
+| `FORUM_TAGS` | Forum channel tags | None |
+| `ONLINE_STATUS` | User online status | `GUILD_PRESENCES` |
+| `SCHEDULED_EVENTS` | Guild scheduled events | `SCHEDULED_EVENTS` |
+
+<Warning>
+Some cache flags require specific gateway intents. If the intent is disabled, the cache flag is automatically disabled.
+</Warning>
+
+## Member Cache Policy
+
+The member cache policy determines which members are cached:
+
+### Built-in Policies
+
+```java
+// Cache no members
+JDABuilder.createDefault(token)
+    .setMemberCachePolicy(MemberCachePolicy.NONE)
+    .build();
+
+// Cache all members (requires GUILD_MEMBERS intent)
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_MEMBERS)
+    .setMemberCachePolicy(MemberCachePolicy.ALL)
+    .build();
+
+// Cache only voice members (default)
+JDABuilder.createDefault(token)
+    .setMemberCachePolicy(MemberCachePolicy.VOICE)
+    .build();
+
+// Cache only online members (requires GUILD_PRESENCES)
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_PRESENCES)
+    .setMemberCachePolicy(MemberCachePolicy.ONLINE)
+    .build();
+
+// Cache guild owner
+JDABuilder.createDefault(token)
+    .setMemberCachePolicy(MemberCachePolicy.OWNER)
+    .build();
+
+// Cache boosting members
+JDABuilder.createDefault(token)
+    .setMemberCachePolicy(MemberCachePolicy.BOOSTER)
+    .build();
+```
+
+### Combining Policies
+
+```java
+// Cache voice members OR boosters
+MemberCachePolicy policy = MemberCachePolicy.VOICE.or(MemberCachePolicy.BOOSTER);
+
+JDABuilder.createDefault(token)
+    .setMemberCachePolicy(policy)
+    .build();
+
+// Cache voice members AND have a specific role
+MemberCachePolicy policy = MemberCachePolicy.VOICE.and(
+    member -> member.getRoles().stream()
+        .anyMatch(role -> role.getId().equals("123456789"))
+);
+```
+
+### Custom Policy
+
+```java
+// Cache members with specific role
+MemberCachePolicy customPolicy = member -> {
+    return member.getRoles().stream()
+        .anyMatch(role -> role.getName().equals("VIP"));
+};
+
+JDABuilder.createDefault(token)
+    .setMemberCachePolicy(customPolicy)
+    .build();
+```
+
+## Chunking Filter
+
+Chunking loads all members of a guild into cache. This requires the `GUILD_MEMBERS` intent.
+
+```java
+// Chunk all guilds
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_MEMBERS)
+    .setChunkingFilter(ChunkingFilter.ALL)
+    .setMemberCachePolicy(MemberCachePolicy.ALL)
+    .build();
+
+// Don't chunk any guilds
+JDABuilder.createDefault(token)
+    .setChunkingFilter(ChunkingFilter.NONE)
+    .build();
+
+// Chunk guilds with less than 1000 members
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_MEMBERS)
+    .setChunkingFilter(ChunkingFilter.include(1000))
+    .setMemberCachePolicy(MemberCachePolicy.ALL)
+    .build();
+```
+
+<Warning>
+`ChunkingFilter.ALL` or any chunking requires the `GUILD_MEMBERS` privileged intent.
+</Warning>
+
+## Configuration Examples
+
+### Lightweight Bot (Minimal Cache)
+
+```java
+JDABuilder.createLight(token, EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.MESSAGE_CONTENT
+))
+.setMemberCachePolicy(MemberCachePolicy.NONE)
+.setChunkingFilter(ChunkingFilter.NONE)
+.disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS, CacheFlag.ONLINE_STATUS)
+.build();
+```
+
+### Music Bot (Voice Focused)
+
+```java
+JDABuilder.createLight(token, EnumSet.of(
+    GatewayIntent.GUILD_VOICE_STATES
+))
+.setMemberCachePolicy(MemberCachePolicy.VOICE)
+.enableCache(CacheFlag.VOICE_STATE)
+.build();
+```
+
+### Moderation Bot (Full Member Cache)
+
+```java
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_PRESENCES)
+    .setMemberCachePolicy(MemberCachePolicy.ALL)
+    .setChunkingFilter(ChunkingFilter.ALL)
+    .enableCache(CacheFlag.ONLINE_STATUS, CacheFlag.ACTIVITY)
+    .build();
+```
+
+### Balanced Configuration
+
+```java
+JDABuilder.createDefault(token)
+    .setMemberCachePolicy(MemberCachePolicy.VOICE.or(MemberCachePolicy.OWNER))
+    .setChunkingFilter(ChunkingFilter.NONE)
+    .enableCache(CacheFlag.VOICE_STATE, CacheFlag.EMOJI)
+    .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+    .build();
+```
+
+## Accessing Cached Data
+
+```java
+// Get cached guilds
+List<Guild> guilds = jda.getGuilds();
+
+// Get cached members (depends on cache policy)
+List<Member> members = guild.getMembers();
+
+// Get from cache or null
+Member member = guild.getMemberById("123456789");
+
+// Retrieve from API (not cache)
+RestAction<Member> action = guild.retrieveMemberById("123456789");
+```
+
+<Note>
+Methods starting with `get` return cached data. Methods starting with `retrieve` make API calls.
+</Note>
+
+## Manual Cache Management
+
+You can manually load members into cache:
+
+```java
+// Load all members
+guild.loadMembers().onSuccess(members -> {
+    System.out.println("Loaded " + members.size() + " members");
+});
+
+// Load specific members
+guild.retrieveMembersByIds("123", "456", "789").onSuccess(members -> {
+    System.out.println("Retrieved " + members.size() + " members");
+});
+
+// Chunk guild (load all members)
+guild.loadMembers(member -> {
+    // This callback is called for each loaded member
+    System.out.println("Loaded: " + member.getEffectiveName());
+});
+```
+
+## Memory Optimization
+
+<Tip>
+**Monitor memory usage** - Large bots should carefully configure caching to avoid running out of memory.
+</Tip>
+
+```java
+// For bots in many guilds, avoid caching all members
+JDABuilder.createDefault(token)
+    .setMemberCachePolicy(MemberCachePolicy.OWNER.or(MemberCachePolicy.VOICE))
+    .setChunkingFilter(ChunkingFilter.NONE)
+    .disableCache(
+        CacheFlag.ACTIVITY,
+        CacheFlag.CLIENT_STATUS,
+        CacheFlag.ONLINE_STATUS
+    )
+    .build();
+```
+
+## Best Practices
+
+<Tip>
+**Start minimal** - Begin with `createLight()` and only enable caching as needed.
+</Tip>
+
+<Tip>
+**Match intents to cache** - Enable intents for the cache flags you want to use.
+</Tip>
+
+<Warning>
+**Don't cache presence data unless necessary** - `GUILD_PRESENCES` generates 99% of gateway traffic.
+</Warning>
+
+## Related Pages
+
+- [Gateway Intents](/core-concepts/gateway-intents)
+- [JDABuilder](/core-concepts/jda-builder)
+- [Member Cache Policy](/advanced/member-cache-policy)

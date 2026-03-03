@@ -1,0 +1,514 @@
+---
+title: JDA Interface
+description: Core interface for JDA - the main entry point for interacting with Discord's API
+---
+
+The core of JDA. Acts as a registry system of JDA. All parts of the API can be accessed starting from this interface.
+
+## Overview
+
+The JDA interface is the main entry point for all Discord bot operations. It provides access to:
+- User and guild caches
+- Event management
+- REST operations
+- WebSocket connection management
+- Audio system
+
+## Creating a JDA Instance
+
+Use [JDABuilder](/api/jda-builder) to create a JDA instance:
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.MESSAGE_CONTENT)
+    .build();
+```
+
+## Connection Status
+
+### getStatus
+
+Gets the current connection status of the JDA instance.
+
+<ResponseField name="return" type="Status">
+  The current JDA status
+</ResponseField>
+
+```java
+Status status = jda.getStatus();
+if (status == Status.CONNECTED) {
+    System.out.println("Bot is ready!");
+}
+```
+
+**Status Enum Values:**
+- `INITIALIZING` - JDA is setting up supporting systems
+- `INITIALIZED` - Ready to log in
+- `LOGGING_IN` - Currently attempting to log in
+- `CONNECTING_TO_WEBSOCKET` - Connecting to Discord's WebSocket
+- `IDENTIFYING_SESSION` - Sending authentication
+- `AWAITING_LOGIN_CONFIRMATION` - Waiting for confirmation
+- `LOADING_SUBSYSTEMS` - Populating internal objects
+- `CONNECTED` - Fully connected and operational
+- `DISCONNECTED` - WebSocket disconnected
+- `RECONNECT_QUEUED` - Waiting to reconnect
+- `ATTEMPTING_TO_RECONNECT` - Trying to reconnect
+- `SHUTTING_DOWN` - Shutting down
+- `SHUTDOWN` - Fully shut down
+- `FAILED_TO_LOGIN` - Invalid authentication
+
+### awaitReady
+
+Blocks the current thread until JDA reaches the `CONNECTED` status.
+
+<ResponseField name="return" type="JDA">
+  The current JDA instance for chaining
+</ResponseField>
+
+```java
+JDA jda = JDABuilder.createDefault(token).build();
+jda.awaitReady(); // Wait until bot is ready
+System.out.println("Bot is connected!");
+```
+
+### awaitStatus
+
+Blocks until JDA reaches a specific status.
+
+<ParamField path="status" type="Status" required>
+  The status to wait for
+</ParamField>
+
+<ParamField path="failOn" type="Status...">
+  Optional failure states that force premature return
+</ParamField>
+
+<ResponseField name="return" type="JDA">
+  The current JDA instance for chaining
+</ResponseField>
+
+```java
+jda.awaitStatus(Status.CONNECTED);
+```
+
+## Gateway and Intents
+
+### getGatewayIntents
+
+Returns the enabled gateway intents for this session.
+
+<ResponseField name="return" type="EnumSet<GatewayIntent>">
+  Set of active gateway intents
+</ResponseField>
+
+```java
+EnumSet<GatewayIntent> intents = jda.getGatewayIntents();
+if (intents.contains(GatewayIntent.MESSAGE_CONTENT)) {
+    System.out.println("Can read message content");
+}
+```
+
+### getCacheFlags
+
+Returns the enabled cache flags for this session.
+
+<ResponseField name="return" type="EnumSet<CacheFlag>">
+  Copy of the EnumSet of cache flags
+</ResponseField>
+
+```java
+EnumSet<CacheFlag> flags = jda.getCacheFlags();
+```
+
+## Ping and Latency
+
+### getGatewayPing
+
+The time in milliseconds that Discord took to respond to the last heartbeat.
+
+<ResponseField name="return" type="long">
+  Time in milliseconds between heartbeat and acknowledgment
+</ResponseField>
+
+```java
+long ping = jda.getGatewayPing();
+System.out.println("Gateway ping: " + ping + "ms");
+```
+
+### getRestPing
+
+Requests the current user from the API and calculates response time.
+
+<ResponseField name="return" type="RestAction<Long>">
+  RestAction returning the REST ping in milliseconds
+</ResponseField>
+
+```java
+jda.getRestPing().queue(time -> 
+    System.out.println("REST ping: " + time + "ms")
+);
+```
+
+## User Management
+
+### getSelfUser
+
+Returns the currently logged in account.
+
+<ResponseField name="return" type="SelfUser">
+  The bot's user account
+</ResponseField>
+
+```java
+SelfUser self = jda.getSelfUser();
+System.out.println("Logged in as: " + self.getAsTag());
+```
+
+### getUserById
+
+Retrieves a cached user by ID.
+
+<ParamField path="id" type="long | string" required>
+  The user's ID
+</ParamField>
+
+<ResponseField name="return" type="User">
+  The user, or null if not cached
+</ResponseField>
+
+```java
+User user = jda.getUserById(123456789L);
+if (user != null) {
+    System.out.println("Found user: " + user.getName());
+}
+```
+
+### retrieveUserById
+
+Fetches a user from the API by ID. If cached, returns immediately.
+
+<ParamField path="id" type="long | string" required>
+  The user's ID
+</ParamField>
+
+<ResponseField name="return" type="CacheRestAction<User>">
+  RestAction that retrieves the user
+</ResponseField>
+
+```java
+jda.retrieveUserById(123456789L).queue(user -> {
+    System.out.println("Retrieved: " + user.getName());
+});
+```
+
+### getUserCache
+
+Returns the cache view of all cached users.
+
+<ResponseField name="return" type="SnowflakeCacheView<User>">
+  Cache view of users
+</ResponseField>
+
+```java
+SnowflakeCacheView<User> cache = jda.getUserCache();
+System.out.println("Cached users: " + cache.size());
+```
+
+## Guild Management
+
+### getGuildById
+
+Retrieves a cached guild by ID.
+
+<ParamField path="id" type="long | string" required>
+  The guild's ID
+</ParamField>
+
+<ResponseField name="return" type="Guild">
+  The guild, or null if not cached
+</ResponseField>
+
+```java
+Guild guild = jda.getGuildById(987654321L);
+if (guild != null) {
+    System.out.println("Guild: " + guild.getName());
+}
+```
+
+### getGuilds
+
+Returns an immutable list of all cached guilds.
+
+<ResponseField name="return" type="List<Guild>">
+  List of all guilds this bot is connected to
+</ResponseField>
+
+```java
+List<Guild> guilds = jda.getGuilds();
+System.out.println("Connected to " + guilds.size() + " guilds");
+```
+
+### getGuildCache
+
+Returns the cache view of all cached guilds.
+
+<ResponseField name="return" type="SnowflakeCacheView<Guild>">
+  Cache view of guilds
+</ResponseField>
+
+```java
+SnowflakeCacheView<Guild> cache = jda.getGuildCache();
+```
+
+## Event Management
+
+### addEventListener
+
+Adds event listeners to handle Discord events.
+
+<ParamField path="listeners" type="Object..." required>
+  One or more EventListener instances
+</ParamField>
+
+```java
+jda.addEventListener(new MessageListener(), new ReadyListener());
+```
+
+### removeEventListener
+
+Removes previously registered event listeners.
+
+<ParamField path="listeners" type="Object..." required>
+  One or more EventListener instances to remove
+</ParamField>
+
+```java
+jda.removeEventListener(listener);
+```
+
+### setEventManager
+
+Changes the internal event manager implementation.
+
+<ParamField path="manager" type="IEventManager">
+  The new event manager (null to use default)
+</ParamField>
+
+```java
+jda.setEventManager(new AnnotatedEventManager());
+```
+
+### listenOnce
+
+Creates a builder for one-time event listeners.
+
+<ParamField path="eventType" type="Class<E>" required>
+  The type of event to listen for
+</ParamField>
+
+<ResponseField name="return" type="Once.Builder<E>">
+  Builder for configuring the one-time listener
+</ResponseField>
+
+```java
+jda.listenOnce(MessageReceivedEvent.class)
+    .filter(e -> e.getAuthor().getId().equals(userId))
+    .timeout(Duration.ofSeconds(30))
+    .subscribe(event -> {
+        System.out.println("Received: " + event.getMessage().getContentRaw());
+    });
+```
+
+## Command Management
+
+### retrieveCommands
+
+Retrieves the list of global slash commands.
+
+<ParamField path="withLocalizations" type="boolean" default="false">
+  Whether to include localization data
+</ParamField>
+
+<ResponseField name="return" type="RestAction<List<Command>>">
+  RestAction returning list of commands
+</ResponseField>
+
+```java
+jda.retrieveCommands().queue(commands -> {
+    System.out.println("Global commands: " + commands.size());
+});
+```
+
+### upsertCommand
+
+Creates or updates a global command.
+
+<ParamField path="command" type="CommandData" required>
+  The command data
+</ParamField>
+
+<ResponseField name="return" type="RestAction<Command>">
+  RestAction that creates or updates the command
+</ResponseField>
+
+```java
+CommandData data = Commands.slash("ping", "Check bot latency");
+jda.upsertCommand(data).queue();
+```
+
+### updateCommands
+
+Replaces all global commands with a new list.
+
+<ResponseField name="return" type="CommandListUpdateAction">
+  Action to configure and execute the update
+</ResponseField>
+
+```java
+jda.updateCommands()
+    .addCommands(
+        Commands.slash("ping", "Check latency"),
+        Commands.slash("help", "Show help")
+    )
+    .queue();
+```
+
+### deleteCommandById
+
+Deletes a global command by ID.
+
+<ParamField path="commandId" type="long | string" required>
+  The command's ID
+</ParamField>
+
+<ResponseField name="return" type="RestAction<Void>">
+  RestAction to delete the command
+</ResponseField>
+
+```java
+jda.deleteCommandById("123456789").queue();
+```
+
+## Private Channels
+
+### openPrivateChannelById
+
+Opens a private channel with a user.
+
+<ParamField path="userId" type="long | string" required>
+  The user's ID
+</ParamField>
+
+<ResponseField name="return" type="CacheRestAction<PrivateChannel>">
+  RestAction that opens the private channel
+</ResponseField>
+
+```java
+jda.openPrivateChannelById(userId)
+    .flatMap(channel -> channel.sendMessage("Hello!"))
+    .queue();
+```
+
+## Presence and Activity
+
+### getPresence
+
+Returns the presence manager for this bot.
+
+<ResponseField name="return" type="Presence">
+  The presence manager
+</ResponseField>
+
+```java
+Presence presence = jda.getPresence();
+presence.setActivity(Activity.playing("a game"));
+presence.setStatus(OnlineStatus.ONLINE);
+```
+
+## Shutdown
+
+### shutdown
+
+Gracefully shuts down JDA, finishing all pending requests.
+
+```java
+jda.shutdown();
+```
+
+### shutdownNow
+
+Immediately shuts down JDA, cancelling all pending requests.
+
+```java
+jda.shutdownNow();
+```
+
+### awaitShutdown
+
+Blocks until shutdown is complete.
+
+<ParamField path="duration" type="long">
+  Maximum time to wait (0 = indefinite)
+</ParamField>
+
+<ParamField path="unit" type="TimeUnit">
+  Time unit for duration
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  True if shutdown completed, false if timeout elapsed
+</ResponseField>
+
+```java
+jda.shutdown();
+if (!jda.awaitShutdown(Duration.ofSeconds(10))) {
+    jda.shutdownNow();
+    jda.awaitShutdown();
+}
+```
+
+## Thread Pools
+
+### getRateLimitPool
+
+Returns the executor used for rate-limit handling.
+
+<ResponseField name="return" type="ScheduledExecutorService">
+  The rate limit pool
+</ResponseField>
+
+### getGatewayPool
+
+Returns the executor used for WebSocket operations.
+
+<ResponseField name="return" type="ScheduledExecutorService">
+  The gateway pool
+</ResponseField>
+
+### getCallbackPool
+
+Returns the executor used for RestAction callbacks.
+
+<ResponseField name="return" type="ExecutorService">
+  The callback pool
+</ResponseField>
+
+## Sharding
+
+### getShardInfo
+
+Returns shard information for this instance.
+
+<ResponseField name="return" type="ShardInfo">
+  The shard info, or ShardInfo.SINGLE if not sharded
+</ResponseField>
+
+```java
+ShardInfo info = jda.getShardInfo();
+System.out.println("Shard: " + info.getShardString());
+```
+
+## Related
+
+- [JDABuilder](/api/jda-builder) - Build and configure JDA instances
+- [RestAction](/api/rest-action) - Asynchronous request handling

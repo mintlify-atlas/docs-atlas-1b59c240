@@ -1,0 +1,537 @@
+---
+title: Error Handling Patterns
+description: Robust error handling strategies for production Discord bots
+---
+
+Proper error handling is essential for building reliable Discord bots. This guide covers JDA's error handling mechanisms and best practices.
+
+## Error Types in JDA
+
+JDA can throw several types of errors:
+
+1. **RestAction Failures** - API requests that fail
+2. **Event Handler Exceptions** - Errors in your event listeners
+3. **Connection Errors** - WebSocket and network issues
+4. **Permission Errors** - Missing permissions for operations
+5. **Rate Limit Errors** - Too many requests
+
+## RestAction Error Handling
+
+### Basic Error Handling
+
+Every `RestAction` should handle potential failures:
+
+```java
+import net.dv8tion.jda.api.exceptions.ErrorHandler;
+import net.dv8tion.jda.api.requests.ErrorResponse;
+import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
+
+// Wrong - no error handling
+channel.sendMessage("Hello").queue();
+
+// Correct - with error handling
+channel.sendMessage("Hello").queue(
+    success -> System.out.println("Message sent!"),
+    failure -> System.err.println("Failed to send: " + failure.getMessage())
+);
+```
+
+### Using ErrorHandler
+
+JDA's `ErrorHandler` provides structured error handling:
+
+```java
+import net.dv8tion.jda.api.exceptions.ErrorHandler;
+import net.dv8tion.jda.api.requests.ErrorResponse;
+
+channel.sendMessage("Hello").queue(null, new ErrorHandler()
+    .handle(
+        ErrorResponse.MISSING_PERMISSIONS,
+        (e) -> channel.sendMessage("I don't have permission to do that!").queue()
+    )
+    .handle(
+        ErrorResponse.UNKNOWN_MESSAGE,
+        (e) -> System.err.println("Message not found")
+    )
+    .handle(
+        ErrorResponse.MISSING_ACCESS,
+        (e) -> System.err.println("Can't access this channel")
+    )
+);
+```
+
+### Common Error Responses
+
+```java
+import net.dv8tion.jda.api.requests.ErrorResponse;
+
+new ErrorHandler()
+    // Missing permissions to perform action
+    .handle(ErrorResponse.MISSING_PERMISSIONS, e -> {
+        System.err.println("Missing permissions!");
+    })
+    // Can't access channel (deleted, private, etc.)
+    .handle(ErrorResponse.MISSING_ACCESS, e -> {
+        System.err.println("No access to channel!");
+    })
+    // Resource not found (message, user, channel deleted)
+    .handle(ErrorResponse.UNKNOWN_MESSAGE, e -> {
+        System.err.println("Message doesn't exist!");
+    })
+    .handle(ErrorResponse.UNKNOWN_CHANNEL, e -> {
+        System.err.println("Channel doesn't exist!");
+    })
+    .handle(ErrorResponse.UNKNOWN_USER, e -> {
+        System.err.println("User doesn't exist!");
+    })
+    // Bot is not in the guild
+    .handle(ErrorResponse.UNKNOWN_GUILD, e -> {
+        System.err.println("Not in that guild!");
+    })
+    // Already processed (e.g., already responded to interaction)
+    .handle(ErrorResponse.UNKNOWN_INTERACTION, e -> {
+        System.err.println("Interaction already acknowledged!");
+    });
+```
+
+### Ignoring Specific Errors
+
+```java
+import net.dv8tion.jda.api.exceptions.ErrorHandler;
+
+// Delete a message, ignore if already deleted
+message.delete().queue(null, new ErrorHandler()
+    .ignore(ErrorResponse.UNKNOWN_MESSAGE)
+);
+
+// Try to send DM, ignore if user has DMs disabled
+user.openPrivateChannel()
+    .flatMap(channel -> channel.sendMessage("Hello!"))
+    .queue(null, new ErrorHandler()
+        .ignore(ErrorResponse.CANNOT_SEND_TO_USER)
+    );
+```
+
+### Handling All Other Errors
+
+```java
+new ErrorHandler()
+    .handle(ErrorResponse.MISSING_PERMISSIONS, e -> {
+        // Handle specific error
+    })
+    .handle(ErrorResponse.MISSING_ACCESS, e -> {
+        // Handle another specific error
+    })
+    .handle(
+        // Catch all other errors
+        EnumSet.allOf(ErrorResponse.class),
+        e -> System.err.println("Unexpected error: " + e.getMessage())
+    );
+```
+
+## Event Handler Error Handling
+
+### Try-Catch in Event Listeners
+
+Always wrap event logic in try-catch:
+
+```java
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+
+public class SafeListener extends ListenerAdapter {
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        try {
+            // Your event handling logic
+            processMessage(event.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error handling message: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Optionally notify the user
+            event.getChannel()
+                .sendMessage("An error occurred processing your message.")
+                .queue();
+        }
+    }
+    
+    private void processMessage(Message message) {
+        // Your logic here
+    }
+}
+```
+
+### Global Exception Handler
+
+Create a wrapper for all event listeners:
+
+```java
+import net.dv8tion.jda.api.hooks.EventListener;
+import net.dv8tion.jda.api.events.GenericEvent;
+
+public class SafeEventListener implements EventListener {
+    private final EventListener delegate;
+    
+    public SafeEventListener(EventListener delegate) {
+        this.delegate = delegate;
+    }
+    
+    @Override
+    public void onEvent(GenericEvent event) {
+        try {
+            delegate.onEvent(event);
+        } catch (Exception e) {
+            System.err.println("Error in event listener: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Log to monitoring service
+            logError(event, e);
+        }
+    }
+    
+    private void logError(GenericEvent event, Exception e) {
+        // Send to logging service (Sentry, etc.)
+    }
+}
+
+// Usage
+JDABuilder.createDefault(token)
+    .addEventListeners(new SafeEventListener(new MyListener()))
+    .build();
+```
+
+## Permission Checking
+
+Always check permissions before attempting operations:
+
+```java
+import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+
+public class PermissionChecker {
+    public void deleteMessage(TextChannel channel, Message message) {
+        Member selfMember = channel.getGuild().getSelfMember();
+        
+        // Check bot permissions
+        if (!selfMember.hasPermission(channel, Permission.MESSAGE_MANAGE)) {
+            channel.sendMessage("I need Manage Messages permission!")
+                .queue();
+            return;
+        }
+        
+        // Safe to delete
+        message.delete().queue();
+    }
+    
+    public void banUser(Member target, Member moderator) {
+        Guild guild = target.getGuild();
+        Member selfMember = guild.getSelfMember();
+        
+        // Check if bot has permission
+        if (!selfMember.hasPermission(Permission.BAN_MEMBERS)) {
+            return; // Can't ban
+        }
+        
+        // Check if moderator has permission
+        if (!moderator.hasPermission(Permission.BAN_MEMBERS)) {
+            return; // Moderator can't ban
+        }
+        
+        // Check role hierarchy
+        if (!selfMember.canInteract(target)) {
+            return; // Target has higher role
+        }
+        
+        if (!moderator.canInteract(target)) {
+            return; // Moderator can't interact with target
+        }
+        
+        // Safe to ban
+        guild.ban(target, 0, TimeUnit.DAYS)
+            .reason("Banned by " + moderator.getUser().getAsTag())
+            .queue();
+    }
+}
+```
+
+### Permission Utilities
+
+```java
+import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+
+public class PermissionUtils {
+    /**
+     * Check if member has all specified permissions in a channel
+     */
+    public static boolean hasPermissions(
+        Member member,
+        GuildChannel channel,
+        Permission... permissions
+    ) {
+        return member.hasPermission(channel, permissions);
+    }
+    
+    /**
+     * Get missing permissions for a member
+     */
+    public static List<Permission> getMissingPermissions(
+        Member member,
+        GuildChannel channel,
+        Permission... required
+    ) {
+        List<Permission> missing = new ArrayList<>();
+        for (Permission perm : required) {
+            if (!member.hasPermission(channel, perm)) {
+                missing.add(perm);
+            }
+        }
+        return missing;
+    }
+    
+    /**
+     * Format missing permissions for user-friendly message
+     */
+    public static String formatMissingPermissions(List<Permission> missing) {
+        if (missing.isEmpty()) {
+            return "None";
+        }
+        return missing.stream()
+            .map(Permission::getName)
+            .collect(Collectors.joining(", "));
+    }
+}
+```
+
+## Null Safety
+
+Many JDA methods can return null:
+
+```java
+import javax.annotation.Nullable;
+
+public class NullSafetyExample {
+    public void handleCommand(SlashCommandInteractionEvent event) {
+        // Options might be null
+        OptionMapping option = event.getOption("user");
+        if (option != null) {
+            User user = option.getAsUser();
+            // Use user
+        }
+        
+        // Members might be null (user not in guild)
+        User user = event.getUser();
+        Member member = event.getMember();
+        if (member == null) {
+            event.reply("This command only works in servers!")
+                .setEphemeral(true)
+                .queue();
+            return;
+        }
+        
+        // Channels might be deleted
+        TextChannel channel = guild.getTextChannelById(id);
+        if (channel == null) {
+            // Channel doesn't exist
+            return;
+        }
+    }
+}
+```
+
+## Rate Limit Handling
+
+JDA handles rate limits automatically, but you can customize behavior:
+
+```java
+import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.api.exceptions.RateLimitedException;
+
+// Wait for rate limits (default behavior)
+RestAction.setDefaultTimeout(30, TimeUnit.SECONDS);
+
+// Pass through rate limits (will throw exception)
+RestAction.setPassContext(true);
+
+// Handle rate limit manually
+channel.sendMessage("Hello").queue(
+    success -> {},
+    failure -> {
+        if (failure instanceof RateLimitedException) {
+            System.err.println("Rate limited! Retry after: " + 
+                ((RateLimitedException) failure).getRetryAfter());
+        }
+    }
+);
+```
+
+## Interaction Timeouts
+
+Interactions must be acknowledged within 3 seconds:
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    // Defer immediately if processing takes time
+    event.deferReply().queue();
+    
+    // Do long operation
+    try {
+        String result = performLongOperation();
+        event.getHook().sendMessage(result).queue();
+    } catch (Exception e) {
+        event.getHook()
+            .sendMessage("An error occurred: " + e.getMessage())
+            .queue();
+    }
+}
+
+private String performLongOperation() {
+    // Simulate long operation
+    try {
+        Thread.sleep(5000);
+        return "Operation complete!";
+    } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+    }
+}
+```
+
+## Logging Best Practices
+
+Use a proper logging framework:
+
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class MyBot extends ListenerAdapter {
+    private static final Logger log = LoggerFactory.getLogger(MyBot.class);
+    
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        try {
+            processMessage(event);
+        } catch (Exception e) {
+            log.error("Error processing message from {}: {}",
+                event.getAuthor().getAsTag(),
+                event.getMessage().getContentRaw(),
+                e
+            );
+        }
+    }
+    
+    private void processMessage(MessageReceivedEvent event) {
+        log.debug("Processing message: {}", event.getMessage().getId());
+        // Your logic
+        log.info("Successfully processed message from {}",
+            event.getAuthor().getAsTag());
+    }
+}
+```
+
+## Error Recovery Strategies
+
+### Retry Logic
+
+```java
+import java.util.concurrent.TimeUnit;
+
+public class RetryUtils {
+    public static <T> void queueWithRetry(
+        RestAction<T> action,
+        int maxRetries,
+        Consumer<T> success,
+        Consumer<Throwable> failure
+    ) {
+        queueWithRetry(action, maxRetries, 0, success, failure);
+    }
+    
+    private static <T> void queueWithRetry(
+        RestAction<T> action,
+        int maxRetries,
+        int attempt,
+        Consumer<T> success,
+        Consumer<Throwable> failure
+    ) {
+        action.queue(success, error -> {
+            if (attempt < maxRetries) {
+                // Wait before retry (exponential backoff)
+                long delay = (long) Math.pow(2, attempt) * 1000;
+                
+                try {
+                    Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                
+                queueWithRetry(action, maxRetries, attempt + 1, success, failure);
+            } else {
+                failure.accept(error);
+            }
+        });
+    }
+}
+
+// Usage
+RetryUtils.queueWithRetry(
+    channel.sendMessage("Hello"),
+    3,
+    msg -> System.out.println("Sent!"),
+    error -> System.err.println("Failed after 3 retries")
+);
+```
+
+### Graceful Degradation
+
+```java
+public void sendNotification(User user, String message) {
+    // Try to DM the user
+    user.openPrivateChannel()
+        .flatMap(channel -> channel.sendMessage(message))
+        .queue(
+            success -> log.info("Sent DM to {}", user.getAsTag()),
+            error -> {
+                // DM failed, try mentioning in a channel instead
+                TextChannel fallbackChannel = getFallbackChannel();
+                if (fallbackChannel != null) {
+                    fallbackChannel.sendMessage(
+                        user.getAsMention() + " " + message
+                    ).queue();
+                }
+            }
+        );
+}
+```
+
+## Best Practices Summary
+
+<Tip>
+**Error Handling Checklist:**
+- Always provide error callbacks for `queue()` calls
+- Check permissions before operations
+- Handle null values from getters
+- Use try-catch in all event handlers
+- Defer interactions that take more than 2 seconds
+- Log errors with context for debugging
+- Implement graceful fallbacks for critical features
+</Tip>
+
+<Warning>
+**Common Mistakes:**
+- Not handling errors in queue() calls
+- Ignoring permission checks
+- Not deferring long-running interactions
+- Catching exceptions without logging them
+- Assuming resources (users, channels, messages) still exist
+</Warning>
+
+## Next Steps
+
+- Set up monitoring with tools like Sentry or Datadog
+- Implement health checks for your bot
+- Create an error reporting channel for critical issues
+- Review [JDA's ErrorResponse enum](https://docs.jda.wiki/net/dv8tion/jda/api/requests/ErrorResponse.html)

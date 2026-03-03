@@ -1,0 +1,494 @@
+---
+title: Scaling with Sharding
+description: Scale your Discord bot across multiple shards for large server deployments
+---
+
+When your bot grows to thousands of servers, you need sharding to distribute the load across multiple connections. This guide explains how to implement sharding with JDA.
+
+## What is Sharding?
+
+Sharding splits your bot's guilds across multiple WebSocket connections (shards). Each shard handles a subset of your guilds, allowing you to:
+
+- Scale beyond Discord's per-connection limits
+- Distribute processing load
+- Improve reliability and performance
+- Meet Discord's sharding requirements
+
+<Note>
+Discord requires sharding when your bot reaches **2,500 guilds**. You can implement it earlier for better performance.
+</Note>
+
+## When to Shard
+
+You should implement sharding when:
+
+- Your bot is in 2,500+ guilds (required by Discord)
+- You want to distribute load across multiple processes
+- You need better isolation between guild groups
+- You're preparing for future growth
+
+## ShardManager vs Manual Sharding
+
+JDA offers two approaches:
+
+### DefaultShardManager (Recommended)
+
+Manages multiple shards automatically in one process:
+
+```java
+import net.dv8tion.jda.api.sharding.DefaultShardManagerBuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+EnumSet<GatewayIntent> intents = EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.MESSAGE_CONTENT
+);
+
+DefaultShardManagerBuilder builder = DefaultShardManagerBuilder
+    .createDefault(token)
+    .setEnabledIntents(intents)
+    .addEventListeners(new MyEventListener());
+
+ShardManager shardManager = builder.build();
+```
+
+### Manual Sharding
+
+Run separate JDA instances across multiple processes:
+
+```java
+// Process 1: Shard 0
+JDA shard0 = JDABuilder.createDefault(token)
+    .useSharding(0, 2)  // Shard 0 of 2
+    .build();
+
+// Process 2: Shard 1
+JDA shard1 = JDABuilder.createDefault(token)
+    .useSharding(1, 2)  // Shard 1 of 2
+    .build();
+```
+
+## Using DefaultShardManager
+
+### Basic Setup
+
+```java
+import net.dv8tion.jda.api.sharding.DefaultShardManagerBuilder;
+import net.dv8tion.jda.api.sharding.ShardManager;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.entities.Activity;
+import java.util.EnumSet;
+
+public class ShardedBot {
+    public static void main(String[] args) {
+        String token = System.getenv("BOT_TOKEN");
+
+        EnumSet<GatewayIntent> intents = EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.DIRECT_MESSAGES,
+            GatewayIntent.MESSAGE_CONTENT
+        );
+
+        ShardManager shardManager = DefaultShardManagerBuilder
+            .createDefault(token)
+            .setEnabledIntents(intents)
+            .addEventListeners(new CommandHandler())
+            .setActivity(Activity.playing("on multiple shards"))
+            .build();
+
+        System.out.println("Shard Manager started!");
+    }
+}
+```
+
+### Builder Presets
+
+Like JDABuilder, DefaultShardManagerBuilder offers presets:
+
+```java
+// Minimal cache (low memory)
+ShardManager sm = DefaultShardManagerBuilder
+    .createLight(token, intents)
+    .build();
+
+// Recommended defaults
+ShardManager sm = DefaultShardManagerBuilder
+    .createDefault(token)
+    .build();
+
+// Full cache
+ShardManager sm = DefaultShardManagerBuilder
+    .create(token, intents)
+    .build();
+```
+
+## Configuring Shard Count
+
+### Automatic (Recommended)
+
+Let Discord determine the optimal shard count:
+
+```java
+// Discord automatically calculates shard count
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    .build();
+```
+
+### Manual Shard Count
+
+Specify the total number of shards:
+
+```java
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    .setShardsTotal(4)  // Create 4 shards
+    .build();
+```
+
+### Specific Shard IDs
+
+Run only certain shards (useful for distributed systems):
+
+```java
+import java.util.List;
+
+// Only run shards 0, 1, and 2 out of 10 total
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    .setShardsTotal(10)
+    .setShards(0, 1, 2)  // Run these specific shards
+    .build();
+
+// Or use a collection
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    .setShardsTotal(10)
+    .setShards(List.of(0, 1, 2))
+    .build();
+```
+
+## Per-Shard Configuration
+
+### Per-Shard Activities
+
+```java
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    .setActivityProvider(shardId -> 
+        Activity.playing("Shard " + shardId)
+    )
+    .build();
+```
+
+### Per-Shard Status
+
+```java
+import net.dv8tion.jda.api.OnlineStatus;
+
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    .setStatusProvider(shardId -> {
+        // Shard 0 is always online, others idle
+        return shardId == 0 ? OnlineStatus.ONLINE : OnlineStatus.IDLE;
+    })
+    .build();
+```
+
+### Per-Shard Event Listeners
+
+```java
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    .addEventListenerProvider(shardId -> new ShardSpecificListener(shardId))
+    .build();
+
+public class ShardSpecificListener extends ListenerAdapter {
+    private final int shardId;
+
+    public ShardSpecificListener(int shardId) {
+        this.shardId = shardId;
+    }
+
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        System.out.println("Shard " + shardId + " received: " + 
+            event.getMessage().getContentDisplay());
+    }
+}
+```
+
+## Working with Shards
+
+### Accessing Individual Shards
+
+```java
+ShardManager shardManager = // ... build
+
+// Get a specific shard
+JDA shard = shardManager.getShardById(0);
+
+// Get shard for a specific guild
+Guild guild = // ...
+JDA shardForGuild = shardManager.getShardById(guild.getIdLong());
+
+// Iterate all shards
+for (JDA shard : shardManager.getShards()) {
+    System.out.println("Shard " + shard.getShardInfo().getShardId() + 
+        " has " + shard.getGuilds().size() + " guilds");
+}
+```
+
+### Shard Statistics
+
+```java
+ShardManager shardManager = // ... build
+
+// Total guilds across all shards
+long totalGuilds = shardManager.getGuildCache().size();
+
+// Total users across all shards
+long totalUsers = shardManager.getUserCache().size();
+
+// Shards information
+int totalShards = shardManager.getShardsTotal();
+int runningShards = shardManager.getShardsRunning();
+
+System.out.println("Running " + runningShards + "/" + totalShards + " shards");
+System.out.println("Total guilds: " + totalGuilds);
+```
+
+### Checking Shard Status
+
+```java
+for (JDA shard : shardManager.getShards()) {
+    JDA.Status status = shard.getStatus();
+    int shardId = shard.getShardInfo().getShardId();
+    
+    System.out.println("Shard " + shardId + ": " + status);
+    
+    // Check if ready
+    if (status == JDA.Status.CONNECTED) {
+        System.out.println("  Guilds: " + shard.getGuilds().size());
+    }
+}
+```
+
+## Session Controller
+
+Control how shards connect to Discord:
+
+```java
+import net.dv8tion.jda.api.utils.SessionController;
+import net.dv8tion.jda.api.utils.SessionControllerAdapter;
+
+// Custom session controller
+SessionController controller = new SessionControllerAdapter() {
+    @Override
+    public void appendSession(SessionConnectNode node) {
+        // Custom connection logic
+        super.appendSession(node);
+    }
+};
+
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    .setSessionController(controller)
+    .build();
+```
+
+<Note>
+The default session controller handles rate limiting and sequential shard startup automatically.
+</Note>
+
+## Thread Pool Configuration
+
+Configure thread pools for optimal performance:
+
+```java
+import net.dv8tion.jda.api.sharding.ThreadPoolProvider;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    // Gateway pool (WebSocket handling)
+    .setGatewayPoolProvider(total -> 
+        Executors.newScheduledThreadPool(
+            Math.max(1, (int) Math.log(total))
+        )
+    )
+    // Callback pool (RestAction callbacks)
+    .setCallbackPoolProvider(total -> 
+        Executors.newFixedThreadPool(total * 2)
+    )
+    // Event pool (event dispatching)
+    .setEventPoolProvider(total -> 
+        Executors.newFixedThreadPool(total)
+    )
+    .build();
+```
+
+## Cache Configuration
+
+Same cache flags work with ShardManager:
+
+```java
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault(token)
+    // Disable specific cache flags
+    .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+    // Set member cache policy
+    .setMemberCachePolicy(MemberCachePolicy.VOICE)
+    .build();
+```
+
+## Shard-Aware Commands
+
+Register commands across all shards:
+
+```java
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
+
+// Register globally across all shards
+shardManager.getShards().forEach(shard -> {
+    shard.updateCommands()
+        .addCommands(
+            Commands.slash("stats", "Show shard statistics")
+        )
+        .queue();
+});
+
+// Or use ShardManager directly
+shardManager.getShardCache().forEach(shard -> {
+    // Configure each shard
+});
+```
+
+Handle shard information in commands:
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    if (event.getName().equals("stats")) {
+        JDA jda = event.getJDA();
+        JDA.ShardInfo shardInfo = jda.getShardInfo();
+        
+        String response = String.format(
+            "Shard %d/%d\nGuilds: %d\nPing: %dms",
+            shardInfo.getShardId(),
+            shardInfo.getShardTotal(),
+            jda.getGuilds().size(),
+            jda.getGatewayPing()
+        );
+        
+        event.reply(response).setEphemeral(true).queue();
+    }
+}
+```
+
+## Shutdown and Restart
+
+### Graceful Shutdown
+
+```java
+// Shutdown all shards
+shardManager.shutdown();
+
+// Shutdown specific shard
+shardManager.getShardById(0).shutdown();
+
+// Shutdown and wait
+shardManager.shutdown();
+shardManager.awaitShutdown();  // Blocks until complete
+```
+
+### Restart Shard
+
+```java
+// Restart a specific shard
+JDA shard = shardManager.getShardById(0);
+shard.shutdown();
+shardManager.restart(0);
+```
+
+## Best Practices
+
+<Tip>
+**Sharding Tips:**
+- Start with automatic shard count (let Discord decide)
+- Use `createDefault()` or `createLight()` presets
+- Monitor shard health and restart problematic shards
+- Use per-shard listeners for shard-specific behavior
+- Consider manual sharding across processes for very large bots (10,000+ guilds)
+</Tip>
+
+<Warning>
+**Common Issues:**
+- Don't hardcode shard counts - let Discord calculate or use manual override only when needed
+- Always handle events from all shards when using ShardManager
+- Be aware that cache is per-shard, not global
+- Rate limits are applied per-shard
+</Warning>
+
+## Monitoring Shards
+
+Create a monitoring system:
+
+```java
+import net.dv8tion.jda.api.JDA;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+public class ShardMonitor {
+    private final ShardManager shardManager;
+    private final ScheduledExecutorService scheduler;
+
+    public ShardMonitor(ShardManager shardManager) {
+        this.shardManager = shardManager;
+        this.scheduler = Executors.newScheduledThreadPool(1);
+    }
+
+    public void start() {
+        scheduler.scheduleAtFixedRate(() -> {
+            for (JDA shard : shardManager.getShards()) {
+                JDA.ShardInfo info = shard.getShardInfo();
+                JDA.Status status = shard.getStatus();
+                long ping = shard.getGatewayPing();
+
+                System.out.printf(
+                    "Shard %d/%d - Status: %s, Ping: %dms, Guilds: %d%n",
+                    info.getShardId(),
+                    info.getShardTotal(),
+                    status,
+                    ping,
+                    shard.getGuilds().size()
+                );
+
+                // Restart if shard is stuck
+                if (status == JDA.Status.DISCONNECTED) {
+                    System.out.println("Restarting shard " + info.getShardId());
+                    shardManager.restart(info.getShardId());
+                }
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
+    public void stop() {
+        scheduler.shutdown();
+    }
+}
+```
+
+## Next Steps
+
+- [Implement error handling](/guides/error-handling) for shard failures
+- Monitor your shards with logging and metrics
+- Consider using a load balancer for manual sharding across machines
+- Learn about Discord's [Gateway intents](https://discord.com/developers/docs/topics/gateway#gateway-intents)

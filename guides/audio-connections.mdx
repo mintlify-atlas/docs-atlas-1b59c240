@@ -1,0 +1,520 @@
+---
+title: Setting Up Audio Connections
+description: Connect to voice channels and handle audio sending and receiving with JDA
+---
+
+JDA provides built-in support for connecting to voice channels and handling audio. This guide covers voice connections, audio sending, and audio receiving.
+
+## Prerequisites
+
+<Warning>
+Audio functionality requires additional dependencies beyond JDA core:
+
+1. **DAVE Protocol Implementation** (Required) - For Discord's end-to-end encryption
+2. **Audio Send Factory** (Optional) - For better performance and reduced stuttering
+</Warning>
+
+### Required Dependencies
+
+Add the DAVE protocol implementation:
+
+<CodeGroup>
+```gradle Gradle
+dependencies {
+    implementation("net.dv8tion:JDA:5.2.1")
+    implementation("com.github.MinnDevelopment:jdave:1.0.0") // DAVE protocol
+}
+
+repositories {
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+}
+```
+
+```xml Maven
+<dependencies>
+    <dependency>
+        <groupId>net.dv8tion</groupId>
+        <artifactId>JDA</artifactId>
+        <version>5.2.1</version>
+    </dependency>
+    <dependency>
+        <groupId>com.github.MinnDevelopment</groupId>
+        <artifactId>jdave</artifactId>
+        <version>1.0.0</version>
+    </dependency>
+</dependencies>
+
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+```
+</CodeGroup>
+
+### Optional: Better Performance
+
+For production bots, add udpqueue to avoid audio stuttering from JVM GC pauses:
+
+```gradle
+implementation("club.minnced:udpqueue:1.0.0")
+```
+
+See the [udpqueue documentation](https://github.com/MinnDevelopment/udpqueue.rs) for more details.
+
+## Required Gateway Intents
+
+Voice connections require specific intents:
+
+```java
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+EnumSet<GatewayIntent> intents = EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,      // For accepting commands
+    GatewayIntent.GUILD_VOICE_STATES,  // For voice state updates
+    GatewayIntent.MESSAGE_CONTENT      // For message content access
+);
+```
+
+You also need to enable the `VOICE_STATE` cache flag:
+
+```java
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
+
+JDABuilder.createDefault(token, intents)
+    .enableCache(CacheFlag.VOICE_STATE)
+    .build();
+```
+
+## Configuring Audio Module
+
+Before building JDA, configure the audio module:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.audio.AudioModuleConfig;
+import net.dv8tion.jda.api.audio.dave.DaveSessionFactory;
+import club.minnced.discord.jdave.interop.JDaveSessionFactory;
+
+// Required: DAVE protocol implementation
+DaveSessionFactory daveSessionFactory = new JDaveSessionFactory();
+
+// Optional: Better audio send performance
+// AudioSendFactory audioSendFactory = new NativeAudioSendFactory();
+
+AudioModuleConfig audioModuleConfig = new AudioModuleConfig()
+    .withDaveSessionFactory(daveSessionFactory);
+    // .withAudioSendFactory(audioSendFactory);  // If using udpqueue
+
+JDA jda = JDABuilder.createDefault(token, intents)
+    .setAudioModuleConfig(audioModuleConfig)
+    .enableCache(CacheFlag.VOICE_STATE)
+    .addEventListeners(new VoiceBot())
+    .build();
+```
+
+## Connecting to Voice Channels
+
+<Steps>
+  <Step title="Get the AudioManager">
+    Each guild has its own AudioManager:
+
+    ```java
+    Guild guild = event.getGuild();
+    AudioManager audioManager = guild.getAudioManager();
+    ```
+  </Step>
+
+  <Step title="Set Audio Handlers">
+    Configure sending and/or receiving handlers:
+
+    ```java
+    AudioSendHandler sendHandler = new MyAudioSendHandler();
+    AudioReceiveHandler receiveHandler = new MyAudioReceiveHandler();
+
+    audioManager.setSendingHandler(sendHandler);
+    audioManager.setReceivingHandler(receiveHandler);
+    ```
+  </Step>
+
+  <Step title="Open the Connection">
+    Connect to an audio channel:
+
+    ```java
+    AudioChannel channel = voiceChannel;  // or StageChannel
+    audioManager.openAudioConnection(channel);
+    ```
+  </Step>
+
+  <Step title="Disconnect When Done">
+    Close the connection:
+
+    ```java
+    audioManager.closeAudioConnection();
+    ```
+  </Step>
+</Steps>
+
+## Complete Echo Bot Example
+
+Based on AudioEchoExample.java, here's a bot that echoes voice channel audio:
+
+```java
+import club.minnced.discord.jdave.interop.JDaveSessionFactory;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.audio.AudioModuleConfig;
+import net.dv8tion.jda.api.audio.AudioReceiveHandler;
+import net.dv8tion.jda.api.audio.AudioSendHandler;
+import net.dv8tion.jda.api.audio.CombinedAudio;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.managers.AudioManager;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
+
+import java.nio.ByteBuffer;
+import java.util.EnumSet;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+public class AudioEchoBot extends ListenerAdapter {
+    public static void main(String[] args) {
+        String token = System.getenv("BOT_TOKEN");
+
+        EnumSet<GatewayIntent> intents = EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.GUILD_VOICE_STATES,
+            GatewayIntent.MESSAGE_CONTENT
+        );
+
+        AudioModuleConfig audioConfig = new AudioModuleConfig()
+            .withDaveSessionFactory(new JDaveSessionFactory());
+
+        JDABuilder.createDefault(token, intents)
+            .addEventListeners(new AudioEchoBot())
+            .enableCache(CacheFlag.VOICE_STATE)
+            .setAudioModuleConfig(audioConfig)
+            .build();
+    }
+
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (event.getAuthor().isBot() || !event.isFromGuild()) {
+            return;
+        }
+
+        String content = event.getMessage().getContentRaw();
+
+        if (content.equals("!echo")) {
+            Member member = event.getMember();
+            AudioChannel channel = member.getVoiceState().getChannel();
+
+            if (channel != null) {
+                connectTo(channel);
+                event.getChannel()
+                    .sendMessage("Connecting to " + channel.getName())
+                    .queue();
+            } else {
+                event.getChannel()
+                    .sendMessage("You need to be in a voice channel!")
+                    .queue();
+            }
+        }
+    }
+
+    private void connectTo(AudioChannel channel) {
+        AudioManager audioManager = channel.getGuild().getAudioManager();
+        EchoHandler handler = new EchoHandler();
+
+        audioManager.setSendingHandler(handler);
+        audioManager.setReceivingHandler(handler);
+        audioManager.openAudioConnection(channel);
+    }
+
+    public static class EchoHandler implements AudioSendHandler, AudioReceiveHandler {
+        private final Queue<byte[]> queue = new ConcurrentLinkedQueue<>();
+
+        // Receiving audio
+        @Override
+        public boolean canReceiveCombined() {
+            return queue.size() < 10;  // Limit queue size
+        }
+
+        @Override
+        public void handleCombinedAudio(CombinedAudio combinedAudio) {
+            // Only queue audio when users are speaking
+            if (combinedAudio.getUsers().isEmpty()) {
+                return;
+            }
+
+            byte[] data = combinedAudio.getAudioData(1.0f);  // Volume 100%
+            queue.add(data);
+        }
+
+        // Sending audio
+        @Override
+        public boolean canProvide() {
+            return !queue.isEmpty();
+        }
+
+        @Override
+        public ByteBuffer provide20MsAudio() {
+            byte[] data = queue.poll();
+            return data == null ? null : ByteBuffer.wrap(data);
+        }
+
+        @Override
+        public boolean isOpus() {
+            return false;  // We're sending PCM audio
+        }
+    }
+}
+```
+
+## Audio Sending
+
+Implement `AudioSendHandler` to send audio to Discord:
+
+```java
+import net.dv8tion.jda.api.audio.AudioSendHandler;
+import java.nio.ByteBuffer;
+
+public class MyAudioSendHandler implements AudioSendHandler {
+    private ByteBuffer buffer;
+
+    @Override
+    public boolean canProvide() {
+        // Return true when you have audio to send
+        return buffer != null && buffer.hasRemaining();
+    }
+
+    @Override
+    public ByteBuffer provide20MsAudio() {
+        // Return 20ms of PCM audio (stereo, 48kHz, 16-bit)
+        // That's 3840 bytes: 48000 Hz * 2 channels * 2 bytes * 0.02 seconds
+        ByteBuffer provided = buffer;
+        buffer = null;
+        return provided;
+    }
+
+    @Override
+    public boolean isOpus() {
+        // Return true if you're providing Opus-encoded audio
+        // Return false if you're providing PCM audio (most common)
+        return false;
+    }
+
+    // Your method to add audio data
+    public void provideAudio(ByteBuffer audio) {
+        this.buffer = audio;
+    }
+}
+```
+
+<Note>
+PCM audio format: 48kHz sample rate, stereo (2 channels), 16-bit samples. Each 20ms frame is 3840 bytes.
+</Note>
+
+## Audio Receiving
+
+Implement `AudioReceiveHandler` to receive audio from Discord:
+
+### Receiving Combined Audio
+
+Get all users mixed together:
+
+```java
+import net.dv8tion.jda.api.audio.AudioReceiveHandler;
+import net.dv8tion.jda.api.audio.CombinedAudio;
+
+public class MyAudioReceiveHandler implements AudioReceiveHandler {
+    @Override
+    public boolean canReceiveCombined() {
+        return true;
+    }
+
+    @Override
+    public void handleCombinedAudio(CombinedAudio combinedAudio) {
+        // Get the users currently speaking
+        List<User> users = combinedAudio.getUsers();
+
+        // Get the audio data at specified volume
+        byte[] audio = combinedAudio.getAudioData(1.0f);  // 100% volume
+
+        // Process the audio...
+    }
+}
+```
+
+### Receiving Per-User Audio
+
+Get audio separately for each speaking user:
+
+```java
+import net.dv8tion.jda.api.audio.UserAudio;
+
+public class MyAudioReceiveHandler implements AudioReceiveHandler {
+    @Override
+    public boolean canReceiveUser() {
+        return true;
+    }
+
+    @Override
+    public void handleUserAudio(UserAudio userAudio) {
+        User user = userAudio.getUser();
+        byte[] audio = userAudio.getAudioData(1.0f);
+
+        System.out.println("Received audio from: " + user.getName());
+        // Process this user's audio...
+    }
+}
+```
+
+## Finding Voice Channels
+
+### Get User's Current Channel
+
+```java
+Member member = event.getMember();
+GuildVoiceState voiceState = member.getVoiceState();
+AudioChannel channel = voiceState.getChannel();
+
+if (channel != null) {
+    System.out.println("User is in: " + channel.getName());
+} else {
+    System.out.println("User is not in a voice channel");
+}
+```
+
+### Find Channel by Name or ID
+
+```java
+import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
+import java.util.List;
+
+// By ID
+VoiceChannel channel = guild.getVoiceChannelById("123456789");
+
+// By name (exact match, case-insensitive)
+List<VoiceChannel> channels = guild.getVoiceChannelsByName("General", true);
+if (!channels.isEmpty()) {
+    VoiceChannel channel = channels.get(0);
+}
+```
+
+## AudioManager Configuration
+
+```java
+AudioManager audioManager = guild.getAudioManager();
+
+// Set to self-deafened
+audioManager.setSelfDeafened(true);
+
+// Set to self-muted
+audioManager.setSelfMuted(true);
+
+// Get connection status
+boolean isConnected = audioManager.isConnected();
+boolean isAttempting = audioManager.isAttemptingToConnect();
+
+// Get the connected channel
+AudioChannel connectedChannel = audioManager.getConnectedChannel();
+
+// Close the connection
+audioManager.closeAudioConnection();
+```
+
+## Audio Threading Model
+
+<Warning>
+**Important:** All audio handler methods are called by JDA's audio threads. Do not block these threads with long operations.
+</Warning>
+
+```java
+public class MyAudioSendHandler implements AudioSendHandler {
+    private final Queue<ByteBuffer> audioQueue = new ConcurrentLinkedQueue<>();
+
+    @Override
+    public boolean canProvide() {
+        // This is called frequently - keep it fast!
+        return !audioQueue.isEmpty();
+    }
+
+    @Override
+    public ByteBuffer provide20MsAudio() {
+        // This must return quickly - use pre-prepared buffers
+        return audioQueue.poll();
+    }
+
+    // Add audio from another thread
+    public void queueAudio(ByteBuffer buffer) {
+        audioQueue.offer(buffer);
+    }
+}
+```
+
+## Integration with Music Libraries
+
+For playing music, use a library like [Lavaplayer](https://github.com/lavalink-devs/lavaplayer):
+
+```java
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers;
+import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
+
+public class LavaplayerAudioSendHandler implements AudioSendHandler {
+    private final AudioPlayer audioPlayer;
+    private AudioFrame lastFrame;
+
+    public LavaplayerAudioSendHandler(AudioPlayer audioPlayer) {
+        this.audioPlayer = audioPlayer;
+    }
+
+    @Override
+    public boolean canProvide() {
+        lastFrame = audioPlayer.provide();
+        return lastFrame != null;
+    }
+
+    @Override
+    public ByteBuffer provide20MsAudio() {
+        return ByteBuffer.wrap(lastFrame.getData());
+    }
+
+    @Override
+    public boolean isOpus() {
+        return true;  // Lavaplayer provides Opus
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+**Performance Tips:**
+- Use udpqueue for production bots to avoid GC-related audio stuttering
+- Keep audio handler methods fast - use queues for buffering
+- Limit receive queue sizes to prevent memory issues
+- Use Opus encoding when possible to reduce bandwidth
+</Tip>
+
+<Warning>
+**Common Pitfalls:**
+- Don't forget to enable `CacheFlag.VOICE_STATE`
+- Don't block audio threads with I/O or long computations
+- Remember to configure the DAVE session factory
+- Always check if a user is in a voice channel before connecting
+</Warning>
+
+## Next Steps
+
+- [Scale your bot with sharding](/guides/sharding) for large deployments
+- [Implement error handling](/guides/error-handling) for robust audio features
+- Check out [Lavaplayer documentation](https://github.com/lavalink-devs/lavaplayer) for music bots

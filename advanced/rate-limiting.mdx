@@ -1,0 +1,239 @@
+---
+title: Rate Limit Handling
+description: Advanced rate limit configuration and custom rate limiter implementation
+---
+
+JDA provides sophisticated rate limit handling to ensure your bot respects Discord's API rate limits. This guide covers advanced rate limit configuration and custom implementation.
+
+## Understanding Rate Limits
+
+Discord uses several types of rate limits:
+
+- **Per-route rate limits**: Apply to specific API endpoints
+- **Global rate limits**: Apply to the entire bot token
+- **Cloudflare rate limits**: Apply to the IP address
+
+### Rate Limit Headers
+
+JDA reads the following headers from Discord's API responses:
+
+<ParamField path="X-RateLimit-Reset-After" type="string">
+  Total time (in seconds) until the current rate limit bucket resets. Can have decimals for millisecond precision.
+</ParamField>
+
+<ParamField path="X-RateLimit-Reset" type="string">
+  Epoch time (seconds since January 1, 1970 UTC) at which the rate limit resets.
+</ParamField>
+
+<ParamField path="X-RateLimit-Limit" type="string">
+  The number of requests that can be made to this endpoint.
+</ParamField>
+
+<ParamField path="X-RateLimit-Remaining" type="string">
+  The number of remaining requests that can be made.
+</ParamField>
+
+<ParamField path="X-RateLimit-Bucket" type="string">
+  A unique string denoting the rate limit being encountered (non-inclusive of top-level resources in the path).
+</ParamField>
+
+<ParamField path="X-RateLimit-Scope" type="string">
+  Returned only on HTTP 429 responses. Value can be `user`, `global`, or `shared`.
+</ParamField>
+
+<ParamField path="X-RateLimit-Global" type="boolean">
+  Returned only on HTTP 429 responses if the rate limit encountered is the global rate limit.
+</ParamField>
+
+<ParamField path="Retry-After" type="string">
+  The number of seconds to wait before submitting another request.
+</ParamField>
+
+## Custom Rate Limiter
+
+You can implement a custom rate limiter by implementing the `RestRateLimiter` interface:
+
+```java
+import net.dv8tion.jda.api.requests.RestRateLimiter;
+import net.dv8tion.jda.api.requests.Route;
+import okhttp3.Response;
+
+public class CustomRateLimiter implements RestRateLimiter {
+    private final RateLimitConfig config;
+    private volatile boolean stopped = false;
+    
+    public CustomRateLimiter(RateLimitConfig config) {
+        this.config = config;
+    }
+    
+    @Override
+    public void enqueue(Work task) {
+        if (stopped || task.isSkipped()) {
+            return;
+        }
+        
+        // Get the route for bucket identification
+        Route.CompiledRoute route = task.getRoute();
+        
+        // Execute the request
+        config.getElastic().execute(() -> {
+            Response response = task.execute();
+            if (response != null) {
+                // Handle rate limit headers
+                handleRateLimitHeaders(response, route);
+            }
+        });
+    }
+    
+    private void handleRateLimitHeaders(Response response, Route.CompiledRoute route) {
+        String bucket = response.header(HASH_HEADER);
+        String remaining = response.header(REMAINING_HEADER);
+        String limit = response.header(LIMIT_HEADER);
+        String resetAfter = response.header(RESET_AFTER_HEADER);
+        
+        // Implement your rate limit tracking logic here
+    }
+    
+    @Override
+    public void stop(boolean shutdown, Runnable callback) {
+        stopped = true;
+        callback.run();
+    }
+    
+    @Override
+    public boolean isStopped() {
+        return stopped;
+    }
+    
+    @Override
+    public int cancelRequests() {
+        // Cancel all non-priority requests
+        return 0;
+    }
+}
+```
+
+## Rate Limit Configuration
+
+The `RateLimitConfig` class provides configuration options for the rate limiter:
+
+<ParamField path="scheduler" type="ScheduledExecutorService" required>
+  The scheduler used to schedule rate-limit tasks and delayed executions.
+</ParamField>
+
+<ParamField path="elastic" type="ExecutorService" required>
+  The elastic pool used to execute blocking HTTP requests. Can scale up and down based on demand.
+</ParamField>
+
+<ParamField path="globalRateLimit" type="GlobalRateLimit" required>
+  The global rate-limit store, which can be shared between multiple JDA instances.
+</ParamField>
+
+<ParamField path="isRelative" type="boolean" required>
+  Whether to use `X-RateLimit-Reset-After` (relative) instead of `X-RateLimit-Reset` (absolute). Recommended to avoid NTP sync issues.
+</ParamField>
+
+### Example Configuration
+
+```java
+import net.dv8tion.jda.api.requests.RestRateLimiter;
+import java.util.concurrent.*;
+
+public class RateLimitExample {
+    public void configure() {
+        // Create custom thread pools
+        ScheduledExecutorService scheduler = 
+            Executors.newScheduledThreadPool(2);
+        ExecutorService elastic = 
+            Executors.newCachedThreadPool();
+        
+        // Create shared global rate limit store
+        RestRateLimiter.GlobalRateLimit globalRateLimit = 
+            RestRateLimiter.GlobalRateLimit.create();
+        
+        // Configure rate limiter
+        RestRateLimiter.RateLimitConfig config = 
+            new RestRateLimiter.RateLimitConfig(
+                scheduler,
+                elastic,
+                globalRateLimit,
+                true // Use relative timing
+            );
+    }
+}
+```
+
+## Shared Global Rate Limits
+
+When running multiple bot instances (sharding), you can share global rate limit information:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.RestRateLimiter;
+import net.dv8tion.jda.api.requests.RestConfig;
+
+public class SharedRateLimitExample {
+    public void createShards() {
+        // Create shared global rate limit store
+        RestRateLimiter.GlobalRateLimit sharedGlobal = 
+            RestRateLimiter.GlobalRateLimit.create();
+        
+        // Configure all shards to use the same global rate limit
+        for (int i = 0; i < 4; i++) {
+            RestConfig restConfig = new RestConfig()
+                .setGlobalRateLimit(sharedGlobal);
+            
+            JDABuilder.createDefault(token)
+                .useSharding(i, 4)
+                .setRestConfig(restConfig)
+                .build();
+        }
+    }
+}
+```
+
+<Warning>
+  When implementing a custom rate limiter, ensure you properly handle the `X-RateLimit-Global` header to avoid hitting Discord's global rate limits, which can affect all your bot's operations.
+</Warning>
+
+## Priority Requests
+
+The `Work` interface includes priority detection:
+
+```java
+public void handleWork(RestRateLimiter.Work task) {
+    if (task.isPriority()) {
+        // Handle priority requests immediately
+        // These should not be cancelled
+    } else {
+        // Regular requests can be queued or cancelled
+    }
+}
+```
+
+## Best Practices
+
+1. **Use relative timing**: Set `isRelative` to `true` to avoid clock synchronization issues
+2. **Share global limits**: When sharding, share the `GlobalRateLimit` instance across all shards
+3. **Respect retry headers**: Always honor the `Retry-After` header on 429 responses
+4. **Monitor bucket hashes**: Use the `X-RateLimit-Bucket` header to properly identify unique rate limit buckets
+5. **Don't cancel priority requests**: Requests marked as priority should never be cancelled
+
+## Troubleshooting
+
+### Hitting Rate Limits Frequently
+
+If you're consistently hitting rate limits:
+
+- Review your request patterns for inefficient API usage
+- Implement caching to reduce redundant requests
+- Use bulk operations where possible (e.g., bulk delete messages)
+- Consider implementing request queuing with backoff
+
+### Clock Synchronization Issues
+
+If you experience issues with absolute timestamps:
+
+- Enable relative timing in your `RateLimitConfig`
+- Ensure your server's clock is synchronized with NTP
+- Use `X-RateLimit-Reset-After` instead of `X-RateLimit-Reset`

@@ -1,0 +1,122 @@
+---
+title: Hello World Bot
+description: A simple bot that gets you started with JDA
+---
+
+This is the simplest possible JDA bot. It demonstrates the basic setup required to get a bot running.
+
+## Basic Setup
+
+<Steps>
+  <Step title="Create a JDABuilder">
+    The `JDABuilder` is the entry point for creating your bot. You can choose from different factory methods:
+    - `createLight(token, intents)` - Minimalistic cache profile (lower RAM usage)
+    - `createDefault(token, intents)` - Balanced cache and features
+    - `create(token, intents)` - Full control over configuration
+
+    ```java
+    JDA jda = JDABuilder.createLight(token, intents)
+        .build();
+    ```
+  </Step>
+
+  <Step title="Provide your bot token">
+    Your bot token can be provided in several ways:
+
+    ```java
+    // 1. From a file (recommended)
+    String token = new String(Files.readAllBytes(Paths.get(args[0])), StandardCharsets.UTF_8).trim();
+
+    // 2. From environment variable
+    String token = System.getenv("TOKEN");
+
+    // 3. From system property
+    String token = System.getProperty("token");
+    ```
+
+    <Warning>
+      Never hardcode your token in source code or share it publicly!
+    </Warning>
+  </Step>
+
+  <Step title="Configure Gateway Intents">
+    Intents control which events your bot receives. Only enable what you need for better performance:
+
+    ```java
+    EnumSet<GatewayIntent> intents = EnumSet.of(
+        GatewayIntent.GUILD_MESSAGES,
+        GatewayIntent.DIRECT_MESSAGES
+    );
+    ```
+
+    Learn more about [Gateway Intents](https://jda.wiki/using-jda/gateway-intents-and-member-cache-policy/)
+  </Step>
+
+  <Step title="Build and start the bot">
+    Call `build()` to start the bot and connect to Discord:
+
+    ```java
+    JDA jda = JDABuilder.createLight(token, intents)
+        .setActivity(Activity.watching("Hello World"))
+        .build();
+
+    // Wait for the bot to be ready
+    jda.awaitReady();
+    System.out.println("Bot is ready!");
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.EnumSet;
+
+public class HelloWorld {
+    public static void main(String[] args) throws IOException {
+        // Read token from file
+        String token = new String(Files.readAllBytes(Paths.get(args[0])), StandardCharsets.UTF_8).trim();
+
+        // Configure minimal intents
+        EnumSet<GatewayIntent> intents = EnumSet.noneOf(GatewayIntent.class);
+
+        try {
+            // Create and start the bot
+            JDA jda = JDABuilder.createLight(token, intents)
+                .setActivity(Activity.watching("the world"))
+                .build();
+
+            // Check REST API ping
+            jda.getRestPing().queue(ping ->
+                System.out.println("Logged in with ping: " + ping)
+            );
+
+            // Wait for bot to be fully ready
+            jda.awaitReady();
+            System.out.println("Guilds: " + jda.getGuildCache().size());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+## What's Next?
+
+Now that you have a basic bot running, you can:
+- Add [event listeners](/examples/message-logger) to respond to Discord events
+- Create [slash commands](/examples/slash-bot) for user interactions
+- Explore [interactive components](/examples/components)
+
+<Note>
+  The bot won't do anything yet - it's just connected and idle. Check out the other examples to add functionality!
+</Note>

@@ -1,0 +1,258 @@
+---
+title: Message Logger
+description: Log messages from your Discord server and handle reactions
+---
+
+This example demonstrates how to listen for message events and log them to the console. It also shows how to handle message reactions.
+
+## Overview
+
+The Message Logger bot will:
+- Log all messages from both guilds (servers) and direct messages
+- Display formatted output with server name, channel, author, and content
+- Handle message reactions (specifically the heart emoji)
+- Demonstrate channel type specialization
+
+## Setup
+
+<Steps>
+  <Step title="Configure Gateway Intents">
+    To receive message events, you need to enable specific intents:
+
+    ```java
+    EnumSet<GatewayIntent> intents = EnumSet.of(
+        // Enables MessageReceivedEvent for guild (also known as servers)
+        GatewayIntent.GUILD_MESSAGES,
+        // Enables the event for private channels (also known as direct messages)
+        GatewayIntent.DIRECT_MESSAGES,
+        // Enables access to message.getContentRaw()
+        GatewayIntent.MESSAGE_CONTENT,
+        // Enables MessageReactionAddEvent for guild
+        GatewayIntent.GUILD_MESSAGE_REACTIONS,
+        // Enables MessageReactionAddEvent for private channels
+        GatewayIntent.DIRECT_MESSAGE_REACTIONS
+    );
+    ```
+
+    <Warning>
+      The `MESSAGE_CONTENT` intent is a privileged intent. You need to enable it in the [Discord Developer Portal](https://discord.com/developers/applications) under your bot's settings.
+    </Warning>
+  </Step>
+
+  <Step title="Create the Event Listener">
+    Extend `ListenerAdapter` to handle events:
+
+    ```java
+    public class MessageLoggerExample extends ListenerAdapter {
+        public static final Emoji HEART = Emoji.fromUnicode("U+2764");
+
+        @Override
+        public void onMessageReceived(@Nonnull MessageReceivedEvent event) {
+            // Handle message events
+        }
+
+        @Override
+        public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
+            // Handle reaction events
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Register the Listener">
+    Add your listener when building the JDA instance:
+
+    ```java
+    JDA jda = JDABuilder.createLight(token, intents)
+        .addEventListeners(new MessageLoggerExample())
+        .setActivity(Activity.watching("your messages"))
+        .build();
+    ```
+  </Step>
+</Steps>
+
+## Handling Message Events
+
+The `onMessageReceived` method is called whenever a message is sent in a channel your bot can see:
+
+```java
+@Override
+public void onMessageReceived(@Nonnull MessageReceivedEvent event) {
+    // The user who sent the message
+    User author = event.getAuthor();
+    // The channel where the message was sent
+    MessageChannelUnion channel = event.getChannel();
+    // The actual message
+    Message message = event.getMessage();
+
+    // Check whether the message was sent in a guild / server
+    if (event.isFromGuild()) {
+        String guildName = event.getGuild().getName();
+        String printableContent = message.getContentDisplay();
+
+        System.out.printf(
+            "[%s] [%#s] %#s: %s\n",
+            guildName,
+            channel,    // The %#s makes use of the channel name
+            author,     // The %#s makes use of User#getAsTag
+            printableContent
+        );
+    } else {
+        // This is a message from a private channel
+        System.out.printf("[direct] %#s: %s\n", author, message.getContentDisplay());
+    }
+}
+```
+
+<Note>
+  Use `message.getContentDisplay()` instead of `getContentRaw()` to convert mentions into readable text (e.g., `@user` instead of `<@123456789>`).
+</Note>
+
+## Channel Type Specialization
+
+Channels use a "union" type system that allows you to specialize to more concrete types:
+
+```java
+// Check if the channel is a text channel
+if (channel.getType() == ChannelType.TEXT) {
+    System.out.println("The channel topic is " + channel.asTextChannel().getTopic());
+}
+
+// Check if the channel is a thread
+if (channel.getType().isThread()) {
+    String channelName = channel.asThreadChannel()
+        .getParentChannel()  // Get the parent channel
+        .getName();
+
+    System.out.println("This thread is part of channel #" + channelName);
+}
+```
+
+## Handling Reactions
+
+You can listen for reaction events to detect when users react to messages:
+
+```java
+public static final Emoji HEART = Emoji.fromUnicode("U+2764");
+
+@Override
+public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
+    if (event.getEmoji().equals(HEART)) {
+        System.out.println("A user loved a message!");
+    }
+}
+```
+
+<Tip>
+  Find Unicode codepoints for emojis at [Emojipedia](https://emojipedia.org). For example, the red heart is `U+2764`.
+</Tip>
+
+## Complete Example
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.EnumSet;
+
+import javax.annotation.Nonnull;
+
+public class MessageLoggerExample extends ListenerAdapter {
+    public static final Emoji HEART = Emoji.fromUnicode("U+2764");
+
+    public static void main(String[] args) throws IOException {
+        String token = new String(Files.readAllBytes(Paths.get(args[0])), StandardCharsets.UTF_8).trim();
+
+        EnumSet<GatewayIntent> intents = EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.DIRECT_MESSAGES,
+            GatewayIntent.MESSAGE_CONTENT,
+            GatewayIntent.GUILD_MESSAGE_REACTIONS,
+            GatewayIntent.DIRECT_MESSAGE_REACTIONS
+        );
+
+        try {
+            JDA jda = JDABuilder.createLight(token, intents)
+                .addEventListeners(new MessageLoggerExample())
+                .setActivity(Activity.watching("your messages"))
+                .build();
+
+            jda.getRestPing().queue(ping ->
+                System.out.println("Logged in with ping: " + ping)
+            );
+
+            jda.awaitReady();
+            System.out.println("Guilds: " + jda.getGuildCache().size());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onMessageReceived(@Nonnull MessageReceivedEvent event) {
+        User author = event.getAuthor();
+        MessageChannelUnion channel = event.getChannel();
+        Message message = event.getMessage();
+
+        if (event.isFromGuild()) {
+            String guildName = event.getGuild().getName();
+            String printableContent = message.getContentDisplay();
+
+            System.out.printf(
+                "[%s] [%#s] %#s: %s\n",
+                guildName,
+                channel,
+                author,
+                printableContent
+            );
+        } else {
+            System.out.printf("[direct] %#s: %s\n", author, message.getContentDisplay());
+        }
+
+        if (channel.getType() == ChannelType.TEXT) {
+            System.out.println("The channel topic is " + channel.asTextChannel().getTopic());
+        }
+
+        if (channel.getType().isThread()) {
+            String channelName = channel.asThreadChannel()
+                .getParentChannel()
+                .getName();
+            System.out.println("This thread is part of channel #" + channelName);
+        }
+    }
+
+    @Override
+    public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
+        if (event.getEmoji().equals(HEART)) {
+            System.out.println("A user loved a message!");
+        }
+    }
+}
+```
+
+## Sample Output
+
+When running, you'll see output like:
+
+```
+Logged in with ping: 42
+Guilds: 3
+[My Server] [#general] User#1234: Hello world!
+[My Server] [#general] Bot#5678: Hi there!
+[direct] Friend#9012: Hey!
+A user loved a message!
+```

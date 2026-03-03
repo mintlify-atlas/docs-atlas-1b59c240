@@ -1,0 +1,627 @@
+---
+title: JDABuilder
+description: Builder class for creating and configuring JDA instances
+---
+
+Used to create new [JDA](/api/jda) instances with custom configuration. A single JDABuilder can be reused multiple times to create multiple JDA instances with the same settings.
+
+## Creating a Builder
+
+### createDefault
+
+Creates a JDABuilder with recommended default settings.
+
+<ParamField path="token" type="String">
+  The bot token
+</ParamField>
+
+<ParamField path="intent" type="GatewayIntent">
+  First intent to enable
+</ParamField>
+
+<ParamField path="intents" type="GatewayIntent...">
+  Additional intents to enable
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  Configured JDABuilder instance
+</ResponseField>
+
+**Default Configuration:**
+- Member cache policy: `MemberCachePolicy.DEFAULT`
+- Chunking filter: `ChunkingFilter.NONE`
+- Gateway intents: `GatewayIntent.DEFAULT` (if not specified)
+- Disabled cache: `ACTIVITY`, `CLIENT_STATUS`
+
+```java
+JDABuilder builder = JDABuilder.createDefault(token);
+
+// With specific intents
+JDABuilder builder = JDABuilder.createDefault(
+    token,
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.MESSAGE_CONTENT
+);
+```
+
+### createLight
+
+Creates a JDABuilder with low memory profile settings.
+
+<ParamField path="token" type="String">
+  The bot token
+</ParamField>
+
+<ParamField path="intent" type="GatewayIntent">
+  First intent to enable
+</ParamField>
+
+<ParamField path="intents" type="GatewayIntent...">
+  Additional intents to enable
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  Configured JDABuilder instance
+</ResponseField>
+
+**Light Configuration:**
+- Member cache policy: `MemberCachePolicy.NONE`
+- Chunking filter: `ChunkingFilter.NONE`
+- All cache flags disabled
+- Large threshold: 50
+
+```java
+JDABuilder builder = JDABuilder.createLight(token);
+```
+
+### create
+
+Creates a completely empty JDABuilder with specified intents.
+
+<ParamField path="token" type="String">
+  The bot token (can be set later)
+</ParamField>
+
+<ParamField path="intent" type="GatewayIntent">
+  First intent to enable
+</ParamField>
+
+<ParamField path="intents" type="GatewayIntent... | Collection<GatewayIntent>">
+  Additional intents to enable
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  JDABuilder instance
+</ResponseField>
+
+```java
+// Create with specific intents
+JDABuilder builder = JDABuilder.create(
+    token,
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.GUILD_MEMBERS
+);
+
+// Create with no intents, configure later
+JDABuilder builder = JDABuilder.create(token, EnumSet.noneOf(GatewayIntent.class));
+```
+
+## Building the Instance
+
+### build
+
+Builds the JDA instance and starts the login process.
+
+<ResponseField name="return" type="JDA">
+  The JDA instance
+</ResponseField>
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.MESSAGE_CONTENT)
+    .build();
+```
+
+## Configuration
+
+### Token
+
+#### setToken
+
+Sets the bot token for authentication.
+
+<ParamField path="token" type="String" required>
+  The bot token from Discord Developer Portal
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setToken("your-bot-token");
+```
+
+### Gateway Intents
+
+#### enableIntents
+
+Enables specific gateway intents.
+
+<ParamField path="intent" type="GatewayIntent" required>
+  First intent to enable
+</ParamField>
+
+<ParamField path="intents" type="GatewayIntent... | Collection<GatewayIntent>">
+  Additional intents to enable
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.enableIntents(
+    GatewayIntent.MESSAGE_CONTENT,
+    GatewayIntent.GUILD_MEMBERS
+);
+
+// Or with a collection
+builder.enableIntents(EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.DIRECT_MESSAGES
+));
+```
+
+#### disableIntents
+
+Disables specific gateway intents.
+
+<ParamField path="intent" type="GatewayIntent" required>
+  First intent to disable
+</ParamField>
+
+<ParamField path="intents" type="GatewayIntent... | Collection<GatewayIntent>">
+  Additional intents to disable
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.disableIntents(GatewayIntent.GUILD_PRESENCES);
+```
+
+#### setEnabledIntents
+
+Sets the complete list of enabled intents, replacing any previous configuration.
+
+<ParamField path="intent" type="GatewayIntent" required>
+  First intent to enable
+</ParamField>
+
+<ParamField path="intents" type="GatewayIntent... | Collection<GatewayIntent>">
+  Additional intents to enable
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setEnabledIntents(GatewayIntent.getIntents(GatewayIntent.ALL_INTENTS));
+```
+
+### Cache Configuration
+
+#### enableCache
+
+Enables specific cache flags.
+
+<ParamField path="flag" type="CacheFlag" required>
+  First cache flag to enable
+</ParamField>
+
+<ParamField path="flags" type="CacheFlag... | Collection<CacheFlag>">
+  Additional cache flags to enable
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.enableCache(CacheFlag.ACTIVITY, CacheFlag.VOICE_STATE);
+```
+
+#### disableCache
+
+Disables specific cache flags.
+
+<ParamField path="flag" type="CacheFlag" required>
+  First cache flag to disable
+</ParamField>
+
+<ParamField path="flags" type="CacheFlag... | Collection<CacheFlag>">
+  Additional cache flags to disable
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.disableCache(
+    CacheFlag.ACTIVITY,
+    CacheFlag.CLIENT_STATUS,
+    CacheFlag.ONLINE_STATUS
+);
+```
+
+#### setMemberCachePolicy
+
+Configures which members to cache.
+
+<ParamField path="policy" type="MemberCachePolicy" required>
+  The member cache policy
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+// Cache only members in voice channels
+builder.setMemberCachePolicy(MemberCachePolicy.VOICE);
+
+// Cache voice members OR online members
+builder.setMemberCachePolicy(
+    MemberCachePolicy.VOICE.or(MemberCachePolicy.ONLINE)
+);
+
+// Don't cache any members
+builder.setMemberCachePolicy(MemberCachePolicy.NONE);
+```
+
+#### setChunkingFilter
+
+Configures which guilds should use member chunking.
+
+<ParamField path="filter" type="ChunkingFilter" required>
+  The chunking filter
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+// Don't chunk any guilds
+builder.setChunkingFilter(ChunkingFilter.NONE);
+
+// Chunk all guilds
+builder.setChunkingFilter(ChunkingFilter.ALL);
+
+// Chunk specific guilds only
+builder.setChunkingFilter(ChunkingFilter.include(guildId1, guildId2));
+```
+
+### Event Listeners
+
+#### addEventListeners
+
+Adds event listeners that will be registered when JDA is built.
+
+<ParamField path="listeners" type="Object..." required>
+  One or more event listeners
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.addEventListeners(
+    new MessageListener(),
+    new ReadyListener()
+);
+```
+
+#### setEventManager
+
+Sets the event manager implementation.
+
+<ParamField path="manager" type="IEventManager">
+  The event manager (null for default)
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+// Use annotation-based events
+builder.setEventManager(new AnnotatedEventManager());
+```
+
+### Presence
+
+#### setActivity
+
+Sets the initial activity (game status) for the bot.
+
+<ParamField path="activity" type="Activity">
+  The activity to display
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setActivity(Activity.playing("with commands"));
+builder.setActivity(Activity.listening("music"));
+builder.setActivity(Activity.watching("the server"));
+builder.setActivity(Activity.competing("a tournament"));
+```
+
+#### setStatus
+
+Sets the initial online status for the bot.
+
+<ParamField path="status" type="OnlineStatus" required>
+  The online status
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setStatus(OnlineStatus.ONLINE);
+builder.setStatus(OnlineStatus.IDLE);
+builder.setStatus(OnlineStatus.DO_NOT_DISTURB);
+```
+
+#### setIdle
+
+Sets whether the bot session should be marked as idle.
+
+<ParamField path="idle" type="boolean" required>
+  Whether to mark as idle
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setIdle(false);
+```
+
+### Sharding
+
+#### useSharding
+
+Enables sharding mode for the bot.
+
+<ParamField path="shardId" type="int" required>
+  The shard ID (0-based)
+</ParamField>
+
+<ParamField path="shardTotal" type="int" required>
+  Total number of shards
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+// Create shard 0 of 2 total shards
+builder.useSharding(0, 2);
+```
+
+### Thread Pools
+
+#### setCallbackPool
+
+Sets the executor for RestAction callbacks.
+
+<ParamField path="executor" type="ExecutorService">
+  The executor service
+</ParamField>
+
+<ParamField path="automaticShutdown" type="boolean" default="true">
+  Whether JDA should shutdown this pool
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+ExecutorService executor = Executors.newFixedThreadPool(4);
+builder.setCallbackPool(executor, true);
+```
+
+#### setGatewayPool
+
+Sets the executor for gateway operations.
+
+<ParamField path="pool" type="ScheduledExecutorService">
+  The scheduled executor service
+</ParamField>
+
+<ParamField path="automaticShutdown" type="boolean" default="true">
+  Whether JDA should shutdown this pool
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+#### setRateLimitPool
+
+Sets the executor for rate limit handling.
+
+<ParamField path="pool" type="ScheduledExecutorService">
+  The scheduled executor service
+</ParamField>
+
+<ParamField path="automaticShutdown" type="boolean" default="true">
+  Whether JDA should shutdown this pool
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+### Behavior
+
+#### setAutoReconnect
+
+Configures automatic reconnection on connection errors.
+
+<ParamField path="autoReconnect" type="boolean" required>
+  Whether to automatically reconnect
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setAutoReconnect(true); // Default
+```
+
+#### setBulkDeleteSplittingEnabled
+
+Configures whether bulk delete events should be split into individual events.
+
+<ParamField path="enabled" type="boolean" required>
+  Whether to split bulk deletes
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setBulkDeleteSplittingEnabled(false);
+```
+
+#### setEnableShutdownHook
+
+Configures whether to use a shutdown hook for cleanup.
+
+<ParamField path="enable" type="boolean" required>
+  Whether to enable shutdown hook
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setEnableShutdownHook(true); // Default
+```
+
+#### setCompression
+
+Sets the compression algorithm for the gateway connection.
+
+<ParamField path="compression" type="Compression" required>
+  The compression type
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+builder.setCompression(Compression.ZLIB); // Default
+builder.setCompression(Compression.NONE); // Disable compression
+```
+
+### HTTP Configuration
+
+#### setHttpClient
+
+Sets a custom OkHttpClient for REST requests.
+
+<ParamField path="client" type="OkHttpClient">
+  The HTTP client
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+OkHttpClient client = new OkHttpClient.Builder()
+    .connectTimeout(30, TimeUnit.SECONDS)
+    .build();
+builder.setHttpClient(client);
+```
+
+#### setRestConfig
+
+Sets custom REST configuration including rate limit handling.
+
+<ParamField path="config" type="RestConfig" required>
+  The REST configuration
+</ParamField>
+
+<ResponseField name="return" type="JDABuilder">
+  The builder for chaining
+</ResponseField>
+
+```java
+RestConfig config = new RestConfig()
+    .setBaseUrl("https://discord.com/api/v10")
+    .setTimeout(20000);
+builder.setRestConfig(config);
+```
+
+## Complete Example
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.ChunkingFilter;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
+
+public class Bot {
+    public static void main(String[] args) throws Exception {
+        JDA jda = JDABuilder.createDefault("token")
+            // Configure intents
+            .enableIntents(
+                GatewayIntent.MESSAGE_CONTENT,
+                GatewayIntent.GUILD_MEMBERS
+            )
+            // Configure caching
+            .setMemberCachePolicy(MemberCachePolicy.VOICE)
+            .setChunkingFilter(ChunkingFilter.NONE)
+            .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+            // Set presence
+            .setActivity(Activity.playing("with commands"))
+            // Add listeners
+            .addEventListeners(new MessageListener())
+            // Build
+            .build()
+            .awaitReady();
+        
+        System.out.println("Bot is ready!");
+    }
+}
+```
+
+## Related
+
+- [JDA Interface](/api/jda) - The main JDA interface
+- [RestAction](/api/rest-action) - Asynchronous request handling

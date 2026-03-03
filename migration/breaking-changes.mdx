@@ -1,0 +1,208 @@
+---
+title: Breaking Changes
+description: Breaking changes across JDA versions and migration guidelines
+---
+
+## Versioning Policy
+
+JDA follows a unique versioning approach where **breaking changes are introduced in minor version updates** rather than major versions. This means that updates like `5.1.2` → `5.2.0` may contain breaking changes.
+
+<Warning>
+  Most breaking changes will result in a **minor** version bump (e.g., `5.1.2` → `5.2.0`). Always review release notes before updating.
+</Warning>
+
+## Why Minor Versions?
+
+Due to the nature of the Discord API, JDA needs to quickly adopt newer features and changes from Discord. The development team tries to keep breaking changes minimal but cannot avoid them entirely to maintain compatibility with Discord's evolving platform.
+
+## Migration Strategy
+
+### Before Updating
+
+1. **Read the Release Notes**
+   - Check the [GitHub Releases](https://github.com/discord-jda/JDA/releases) page
+   - Review all versions between your current and target version
+   - Note any deprecated methods or classes
+
+2. **Check Your Dependencies**
+   - Ensure all JDA extensions are compatible with the new version
+   - Update dependencies like Lavaplayer, jda-ktx, or Lavalink clients
+
+3. **Test in a Development Environment**
+   - Never update directly in production
+   - Test all critical bot functionality
+   - Verify event handlers and command interactions
+
+### Common Breaking Changes
+
+<AccordionGroup>
+  <Accordion title="Gateway Intents (v4.2.0+)">
+    **What Changed:**
+    - Gateway Intents became mandatory for most bot functionality
+    - Privileged intents (like `MESSAGE_CONTENT`) must be enabled in the Discord Developer Portal
+
+    **Migration:**
+    ```java
+    // Old (pre-4.2.0)
+    JDABuilder.createDefault(token).build();
+
+    // New (4.2.0+)
+    JDABuilder.createDefault(token, 
+        GatewayIntent.GUILD_MESSAGES, 
+        GatewayIntent.MESSAGE_CONTENT
+    ).build();
+    ```
+
+    **Resources:**
+    - [Gateway Intents Guide](/core-concepts/gateway-intents)
+  </Accordion>
+
+  <Accordion title="Member Cache Changes (v4.2.0+)">
+    **What Changed:**
+    - Member caching is no longer automatic
+    - `MemberCachePolicy` must be configured explicitly
+    - `GUILD_MEMBERS` intent required for member chunking
+
+    **Migration:**
+    ```java
+    // Enable member caching
+    JDABuilder.createDefault(token)
+        .enableIntents(GatewayIntent.GUILD_MEMBERS)
+        .setMemberCachePolicy(MemberCachePolicy.ALL)
+        .build();
+    ```
+  </Accordion>
+
+  <Accordion title="Message Content Changes (v5.0.0+)">
+    **What Changed:**
+    - `MESSAGE_CONTENT` became a privileged intent
+    - Bots must explicitly request this intent in the Developer Portal
+    - `Message.getContentRaw()` returns empty string without the intent
+
+    **Migration:**
+    1. Enable `MESSAGE_CONTENT` in Discord Developer Portal
+    2. Add the intent to your bot:
+    ```java
+    JDABuilder.createDefault(token)
+        .enableIntents(GatewayIntent.MESSAGE_CONTENT)
+        .build();
+    ```
+  </Accordion>
+
+  <Accordion title="RestAction Changes">
+    **What Changed:**
+    - Some methods now return different `RestAction` types
+    - Completion stages and futures have improved type safety
+
+    **Migration:**
+    - Update method signatures that handle `RestAction` results
+    - Review callback types in `queue()` and `submit()` calls
+    - Test async operations thoroughly
+  </Accordion>
+
+  <Accordion title="Event System Changes">
+    **What Changed:**
+    - Some events were renamed or split into multiple events
+    - Event parameters may have changed
+
+    **Migration:**
+    - Review all event listeners
+    - Check for deprecated event classes
+    - Update method signatures to match new event types
+    - Test all event handlers
+  </Accordion>
+</AccordionGroup>
+
+## Version-Specific Changes
+
+### JDA 6.x
+
+The current major version focuses on:
+- Java 8+ compatibility maintained
+- Improved Kotlin interoperability with JSR 305
+- Enhanced audio system with DAVE Protocol support
+- Better REST API coverage
+
+**Minimum Requirements:**
+- Java SE 8 or higher
+- Gradle 8.0+ or Maven 3.6+
+
+### JDA 5.x
+
+Major changes included:
+- Introduction of interaction contexts
+- Enhanced slash command support
+- Improved permission systems
+- Message component updates
+
+### JDA 4.x
+
+Major changes included:
+- Gateway Intents requirement
+- Member cache policy changes
+- Sharding improvements
+
+## Handling Deprecations
+
+### Finding Deprecated Code
+
+```java
+// Enable deprecation warnings in Gradle
+tasks.withType<JavaCompile> {
+    options.compilerArgs.addAll(listOf("-Xlint:deprecation"))
+}
+```
+
+### Replacing Deprecated Methods
+
+1. **Check Javadocs**
+   - Deprecated methods include replacement suggestions
+   - Visit [JDA Documentation](https://docs.jda.wiki)
+
+2. **Search Release Notes**
+   - Find the version where deprecation occurred
+   - Review migration examples
+
+3. **Ask the Community**
+   - Join the [JDA Discord Server](https://discord.gg/0hMr4ce0tIl3SLv5)
+   - Check existing GitHub issues
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Pin Your Version" icon="thumbtack">
+    Always specify exact versions in your dependency management:
+    ```gradle
+    implementation("net.dv8tion:JDA:6.3.1")
+    ```
+  </Card>
+
+  <Card title="Test Before Deploying" icon="flask">
+    Run comprehensive tests before updating production bots
+  </Card>
+
+  <Card title="Monitor Deprecations" icon="triangle-exclamation">
+    Enable compiler warnings to catch deprecated API usage early
+  </Card>
+
+  <Card title="Stay Updated" icon="bell">
+    Watch the GitHub repository for release notifications
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you encounter issues during migration:
+
+- **Documentation**: Check the [JDA Wiki](https://jda.wiki)
+- **Discord Server**: Join [discord.gg/0hMr4ce0tIl3SLv5](https://discord.gg/0hMr4ce0tIl3SLv5)
+- **GitHub Issues**: Search or create issues at [github.com/discord-jda/JDA](https://github.com/discord-jda/JDA/issues)
+- **Stack Overflow**: Tag questions with `jda` and `discord`
+
+<Tip>
+  When reporting migration issues, include:
+  - Previous JDA version
+  - Target JDA version
+  - Complete error messages
+  - Relevant code snippets
+</Tip>

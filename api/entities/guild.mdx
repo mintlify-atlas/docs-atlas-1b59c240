@@ -1,0 +1,335 @@
+---
+title: Guild
+description: API reference for the Guild entity in JDA
+---
+
+Represents a Discord Guild (Server). Contains all information provided from Discord about a Guild.
+
+## Overview
+
+The Guild interface provides access to all guild-specific data including members, channels, roles, and guild settings.
+
+## Key Methods
+
+### Guild Information
+
+<ParamField path="getName()" type="String">
+  The human readable name of the Guild.
+  
+  ```java
+  String name = guild.getName();
+  ```
+</ParamField>
+
+<ParamField path="getIdLong()" type="long">
+  The Snowflake id of this Guild.
+  
+  ```java
+  long guildId = guild.getIdLong();
+  ```
+</ParamField>
+
+<ParamField path="getDescription()" type="String">
+  The description for this guild. This is displayed in the server browser below the guild name for verified guilds.
+  
+  Returns `null` if no description is set.
+  
+  ```java
+  String description = guild.getDescription();
+  ```
+</ParamField>
+
+<ParamField path="getLocale()" type="DiscordLocale">
+  The preferred locale for this guild.
+  
+  Defaults to `DiscordLocale.ENGLISH_US`
+  
+  ```java
+  DiscordLocale locale = guild.getLocale();
+  ```
+</ParamField>
+
+### Guild Assets
+
+<ParamField path="getIconId()" type="String">
+  The Discord hash-id of the Guild icon image. Returns `null` if no icon has been set.
+  
+  ```java
+  String iconId = guild.getIconId();
+  ```
+</ParamField>
+
+<ParamField path="getIconUrl()" type="String">
+  The URL of the Guild icon image. Returns `null` if no icon has been set.
+  
+  ```java
+  String iconUrl = guild.getIconUrl();
+  ```
+</ParamField>
+
+<ParamField path="getBannerId()" type="String">
+  The guild banner id. This is shown in guilds below the guild name.
+  
+  Returns `null` if no banner is set.
+  
+  ```java
+  String bannerId = guild.getBannerId();
+  ```
+</ParamField>
+
+<ParamField path="getSplashId()" type="String">
+  The Discord hash-id of the splash image for this Guild. A Splash image is displayed when viewing a Discord Guild Invite.
+  
+  Returns `null` if no splash has been set.
+  
+  ```java
+  String splashId = guild.getSplashId();
+  ```
+</ParamField>
+
+### Members
+
+<ParamField path="getMemberCount()" type="int">
+  The expected member count for this guild. If the guild is not lazy loaded, this should be identical to the size of the member cache.
+  
+  ```java
+  int memberCount = guild.getMemberCount();
+  ```
+</ParamField>
+
+<ParamField path="getMemberById(long userId)" type="Member">
+  Gets a Member object by user id.
+  
+  Returns `null` if no member with that id exists in this guild.
+  
+  ```java
+  Member member = guild.getMemberById(123456789L);
+  ```
+</ParamField>
+
+<ParamField path="getMemberCache()" type="MemberCacheView">
+  A cache view of all Members in this Guild.
+  
+  ```java
+  MemberCacheView members = guild.getMemberCache();
+  ```
+</ParamField>
+
+<ParamField path="retrieveMemberById(String id)" type="RestAction<Member>">
+  Retrieves a member by their user id.
+  
+  ```java
+  guild.retrieveMemberById("123456789")
+      .queue(member -> {
+          System.out.println("Found: " + member.getEffectiveName());
+      });
+  ```
+</ParamField>
+
+<ParamField path="loadMembers()" type="Task<List<Member>>">
+  Loads all members of this guild. This requires the GUILD_MEMBERS intent.
+  
+  ```java
+  guild.loadMembers()
+      .onSuccess(members -> {
+          System.out.println("Loaded " + members.size() + " members");
+      });
+  ```
+</ParamField>
+
+### Roles
+
+<ParamField path="getRoles()" type="List<Role>">
+  Gets all Roles in this Guild. The roles are ordered by their position descending (highest role first).
+  
+  ```java
+  List<Role> roles = guild.getRoles();
+  ```
+</ParamField>
+
+<ParamField path="getRoleById(long id)" type="Role">
+  Gets a Role by its id.
+  
+  Returns `null` if no role with that id exists.
+  
+  ```java
+  Role role = guild.getRoleById(123456789L);
+  ```
+</ParamField>
+
+<ParamField path="getPublicRole()" type="Role">
+  Gets the @everyone Role for this Guild.
+  
+  ```java
+  Role publicRole = guild.getPublicRole();
+  ```
+</ParamField>
+
+<ParamField path="createRole()" type="RoleAction">
+  Creates a new Role in this Guild.
+  
+  ```java
+  guild.createRole()
+      .setName("Moderator")
+      .setColor(Color.BLUE)
+      .setPermissions(Permission.MESSAGE_MANAGE)
+      .queue();
+  ```
+</ParamField>
+
+### Channels
+
+<ParamField path="getChannels()" type="List<GuildChannel>">
+  Gets all GuildChannels in this Guild.
+  
+  ```java
+  List<GuildChannel> channels = guild.getChannels();
+  ```
+</ParamField>
+
+<ParamField path="getTextChannels()" type="List<TextChannel>">
+  Gets all TextChannels in this Guild.
+  
+  ```java
+  List<TextChannel> textChannels = guild.getTextChannels();
+  ```
+</ParamField>
+
+<ParamField path="getVoiceChannels()" type="List<VoiceChannel>">
+  Gets all VoiceChannels in this Guild.
+  
+  ```java
+  List<VoiceChannel> voiceChannels = guild.getVoiceChannels();
+  ```
+</ParamField>
+
+<ParamField path="getChannelById(long id)" type="GuildChannel">
+  Gets a GuildChannel by its id.
+  
+  Returns `null` if no channel with that id exists.
+  
+  ```java
+  GuildChannel channel = guild.getChannelById(123456789L);
+  ```
+</ParamField>
+
+### Guild Features
+
+<ParamField path="getFeatures()" type="Set<String>">
+  The features of the Guild. Features can indicate special capabilities or requirements.
+  
+  ```java
+  Set<String> features = guild.getFeatures();
+  if (features.contains("COMMUNITY")) {
+      System.out.println("This is a community server");
+  }
+  ```
+</ParamField>
+
+<ParamField path="getBoostTier()" type="BoostTier">
+  The boost tier for this guild. Each tier unlocks new perks for a guild.
+  
+  ```java
+  BoostTier tier = guild.getBoostTier();
+  ```
+</ParamField>
+
+<ParamField path="getBoostCount()" type="int">
+  The amount of boosts this server currently has.
+  
+  ```java
+  int boostCount = guild.getBoostCount();
+  ```
+</ParamField>
+
+<ParamField path="getBoosters()" type="List<Member>">
+  Sorted list of Members that boost this guild. The list is sorted by time boosted ascending.
+  
+  ```java
+  List<Member> boosters = guild.getBoosters();
+  ```
+</ParamField>
+
+### Management
+
+<ParamField path="getManager()" type="GuildManager">
+  The GuildManager for this Guild. Used to modify guild settings.
+  
+  ```java
+  guild.getManager()
+      .setName("New Server Name")
+      .setDescription("A cool server")
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="ban(UserSnowflake user, int deletionTimeframe, TimeUnit unit)" type="AuditableRestAction<Void>">
+  Bans a user from this Guild and deletes messages based on the deletion timeframe.
+  
+  ```java
+  guild.ban(user, 7, TimeUnit.DAYS)
+      .reason("Spam")
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="kick(UserSnowflake user)" type="AuditableRestAction<Void>">
+  Kicks a Member from this Guild.
+  
+  ```java
+  guild.kick(member)
+      .reason("Rule violation")
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="addRoleToMember(UserSnowflake user, Role role)" type="AuditableRestAction<Void>">
+  Adds a Role to a Member.
+  
+  ```java
+  guild.addRoleToMember(member, role)
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="removeRoleFromMember(UserSnowflake user, Role role)" type="AuditableRestAction<Void>">
+  Removes a Role from a Member.
+  
+  ```java
+  guild.removeRoleFromMember(member, role)
+      .queue();
+  ```
+</ParamField>
+
+## Usage Example
+
+```java
+// Get guild information
+Guild guild = event.getGuild();
+System.out.println("Server: " + guild.getName());
+System.out.println("Members: " + guild.getMemberCount());
+System.out.println("Boost Level: " + guild.getBoostTier());
+
+// Manage members
+guild.retrieveMemberById(userId)
+    .queue(member -> {
+        guild.addRoleToMember(member, moderatorRole).queue();
+    });
+
+// Create a channel
+guild.createTextChannel("new-channel")
+    .setTopic("Welcome to the new channel!")
+    .queue();
+
+// Update guild settings
+guild.getManager()
+    .setName("Updated Server Name")
+    .setIcon(Icon.from(file))
+    .queue();
+```
+
+## See Also
+
+- [Member](/api/entities/member)
+- [Role](/api/entities/role)
+- [Channel](/api/entities/channel)

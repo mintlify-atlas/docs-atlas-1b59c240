@@ -1,0 +1,469 @@
+---
+title: ShardManager
+description: Manage multiple JDA shards for large Discord bots
+---
+
+The `ShardManager` interface manages multiple JDA shards, providing a unified API to interact with all shards simultaneously.
+
+## What is Sharding?
+
+Sharding splits your bot across multiple gateway connections, which is required for bots in 2,500+ guilds. Each shard handles a subset of guilds.
+
+## Getting Started
+
+Create a ShardManager using `DefaultShardManagerBuilder`:
+
+```java
+ShardManager shardManager = DefaultShardManagerBuilder
+    .createDefault("YOUR_BOT_TOKEN")
+    .build();
+```
+
+## Shard Information
+
+### getShardsTotal
+
+Gets the total number of managed shards.
+
+```java
+int getShardsTotal()
+```
+
+<ResponseField name="returns" type="int">
+  Total number of shards (running + queued)
+</ResponseField>
+
+### getShardsRunning
+
+Gets the number of currently running shards.
+
+```java
+default int getShardsRunning()
+```
+
+<ResponseField name="returns" type="int">
+  Number of active shards
+</ResponseField>
+
+### getShardsQueued
+
+Gets the number of shards queued for connection.
+
+```java
+int getShardsQueued()
+```
+
+<ResponseField name="returns" type="int">
+  Number of shards waiting to connect
+</ResponseField>
+
+## Shard Access
+
+### getShardById
+
+Retrieves a specific shard by ID.
+
+```java
+JDA getShardById(int id)
+JDA getShardById(String id)
+```
+
+<ParamField path="id" type="int" required>
+  The shard ID
+</ParamField>
+
+<ResponseField name="returns" type="JDA">
+  The JDA instance for that shard, or `null` if not found
+</ResponseField>
+
+**Example:**
+
+```java
+JDA shard = shardManager.getShardById(0);
+if (shard != null) {
+    System.out.println("Shard 0 status: " + shard.getStatus());
+}
+```
+
+### getShardCache
+
+Gets a cache view of all shards.
+
+```java
+ShardCacheView getShardCache()
+```
+
+<ResponseField name="returns" type="ShardCacheView">
+  Cache view of all JDA shards
+</ResponseField>
+
+### getShards
+
+Gets a list of all shard instances.
+
+```java
+default List<JDA> getShards()
+```
+
+<ResponseField name="returns" type="List<JDA>">
+  Immutable list of all JDA instances
+</ResponseField>
+
+**Example:**
+
+```java
+for (JDA shard : shardManager.getShards()) {
+    System.out.println("Shard " + shard.getShardInfo().getShardId() + 
+                       ": " + shard.getGuilds().size() + " guilds");
+}
+```
+
+## Shard Status
+
+### getStatus
+
+Gets the status of a specific shard.
+
+```java
+default JDA.Status getStatus(int shardId)
+```
+
+<ParamField path="shardId" type="int" required>
+  The shard ID to check
+</ParamField>
+
+<ResponseField name="returns" type="JDA.Status">
+  The shard's status, or `null` if shard doesn't exist
+</ResponseField>
+
+### getStatuses
+
+Gets the status of all shards.
+
+```java
+default Map<JDA, Status> getStatuses()
+```
+
+<ResponseField name="returns" type="Map<JDA, Status>">
+  Map of each shard to its current status
+</ResponseField>
+
+**Example:**
+
+```java
+shardManager.getStatuses().forEach((shard, status) -> {
+    int shardId = shard.getShardInfo().getShardId();
+    System.out.println("Shard " + shardId + ": " + status);
+});
+```
+
+## Event Listeners
+
+### addEventListener
+
+Adds event listeners to all shards.
+
+```java
+default void addEventListener(Object... listeners)
+```
+
+<ParamField path="listeners" type="Object..." required>
+  The event listeners to add
+</ParamField>
+
+**Example:**
+
+```java
+shardManager.addEventListener(new MyEventListener());
+```
+
+### removeEventListener
+
+Removes event listeners from all shards.
+
+```java
+default void removeEventListener(Object... listeners)
+```
+
+<ParamField path="listeners" type="Object..." required>
+  The event listeners to remove
+</ParamField>
+
+### addEventListeners
+
+Adds shard-specific event listeners using a provider.
+
+```java
+default void addEventListeners(IntFunction<Object> eventListenerProvider)
+```
+
+<ParamField path="eventListenerProvider" type="IntFunction<Object>" required>
+  Function that takes shard ID and returns a listener
+</ParamField>
+
+**Example:**
+
+```java
+// Create different listener instance per shard
+shardManager.addEventListeners(shardId -> 
+    new ShardSpecificListener(shardId)
+);
+```
+
+## Entity Access
+
+ShardManager provides unified access to entities across all shards:
+
+### getGuildById
+
+Finds a guild across all shards.
+
+```java
+default Guild getGuildById(long id)
+default Guild getGuildById(String id)
+```
+
+<ResponseField name="returns" type="Guild">
+  The guild, or `null` if not found
+</ResponseField>
+
+### getGuildCache
+
+Gets a unified cache of all guilds.
+
+```java
+default SnowflakeCacheView<Guild> getGuildCache()
+```
+
+<ResponseField name="returns" type="SnowflakeCacheView<Guild>">
+  Unified cache view of all guilds across shards
+</ResponseField>
+
+### getUserById
+
+Finds a user across all shards.
+
+```java
+default User getUserById(long id)
+default User getUserById(String id)
+```
+
+<ResponseField name="returns" type="User">
+  The user, or `null` if not found
+</ResponseField>
+
+### retrieveUserById
+
+Retrieves a user by ID, fetching from Discord if needed.
+
+```java
+default RestAction<User> retrieveUserById(long id)
+default RestAction<User> retrieveUserById(String id)
+```
+
+<ResponseField name="returns" type="RestAction<User>">
+  RestAction that completes with the user
+</ResponseField>
+
+**Example:**
+
+```java
+shardManager.retrieveUserById("123456789")
+    .queue(user -> {
+        System.out.println("Found user: " + user.getAsTag());
+    });
+```
+
+## Shard Management
+
+### restart
+
+Restarts all shards or a specific shard.
+
+```java
+void restart()
+void restart(int id)
+```
+
+<ParamField path="id" type="int">
+  The shard ID to restart (optional)
+</ParamField>
+
+**Example:**
+
+```java
+// Restart all shards
+shardManager.restart();
+
+// Restart specific shard
+shardManager.restart(0);
+```
+
+### start
+
+Starts a new shard with the given ID.
+
+```java
+void start(int shardId)
+```
+
+<ParamField path="shardId" type="int" required>
+  The ID of the shard to start
+</ParamField>
+
+### shutdown
+
+Shuts down all shards or a specific shard.
+
+```java
+void shutdown()
+void shutdown(int shardId)
+```
+
+<ParamField path="shardId" type="int">
+  The shard ID to shutdown (optional)
+</ParamField>
+
+**Example:**
+
+```java
+// Shutdown all shards
+shardManager.shutdown();
+
+// Shutdown specific shard
+shardManager.shutdown(2);
+```
+
+<Warning>
+  After calling `shutdown()`, the ShardManager cannot be reused. Operations like `restart()` and `start()` will throw `RejectedExecutionException`.
+</Warning>
+
+## Presence Management
+
+### setActivity
+
+Sets the activity for all shards.
+
+```java
+default void setActivity(Activity activity)
+```
+
+<ParamField path="activity" type="Activity">
+  The activity to set, or `null` to clear
+</ParamField>
+
+**Example:**
+
+```java
+shardManager.setActivity(Activity.playing("with shards"));
+```
+
+### setActivityProvider
+
+Sets shard-specific activities.
+
+```java
+default void setActivityProvider(IntFunction<? extends Activity> activityProvider)
+```
+
+<ParamField path="activityProvider" type="IntFunction<Activity>">
+  Function that takes shard ID and returns an activity
+</ParamField>
+
+**Example:**
+
+```java
+shardManager.setActivityProvider(shardId -> 
+    Activity.playing("Shard " + shardId)
+);
+```
+
+### setStatus
+
+Sets the online status for all shards.
+
+```java
+default void setStatus(OnlineStatus status)
+```
+
+<ParamField path="status" type="OnlineStatus">
+  The status to set
+</ParamField>
+
+### setPresence
+
+Sets both status and activity.
+
+```java
+default void setPresence(OnlineStatus status, Activity activity)
+```
+
+<ParamField path="status" type="OnlineStatus">
+  The online status
+</ParamField>
+<ParamField path="activity" type="Activity">
+  The activity
+</ParamField>
+
+## Statistics
+
+### getAverageGatewayPing
+
+Gets the average gateway ping across all shards.
+
+```java
+default double getAverageGatewayPing()
+```
+
+<ResponseField name="returns" type="double">
+  Average ping in milliseconds, or -1 if no shards are connected
+</ResponseField>
+
+**Example:**
+
+```java
+double avgPing = shardManager.getAverageGatewayPing();
+System.out.println("Average shard ping: " + avgPing + "ms");
+```
+
+### getGatewayIntents
+
+Gets the gateway intents configured for shards.
+
+```java
+default EnumSet<GatewayIntent> getGatewayIntents()
+```
+
+<ResponseField name="returns" type="EnumSet<GatewayIntent>">
+  Set of active gateway intents
+</ResponseField>
+
+## Complete Example
+
+```java
+public class ShardedBot {
+    public static void main(String[] args) {
+        ShardManager shardManager = DefaultShardManagerBuilder
+            .createDefault("YOUR_BOT_TOKEN")
+            .setActivity(Activity.watching("all shards"))
+            .addEventListeners(new GlobalEventListener())
+            .addEventListeners(shardId -> new ShardListener(shardId))
+            .build();
+        
+        // Monitor shard status
+        shardManager.getStatuses().forEach((shard, status) -> {
+            int id = shard.getShardInfo().getShardId();
+            System.out.println("Shard " + id + ": " + status);
+        });
+        
+        // Get statistics
+        System.out.println("Total shards: " + shardManager.getShardsTotal());
+        System.out.println("Running shards: " + shardManager.getShardsRunning());
+        System.out.println("Average ping: " + shardManager.getAverageGatewayPing() + "ms");
+        
+        // Access entities across all shards
+        long guildCount = shardManager.getGuildCache().size();
+        System.out.println("Total guilds: " + guildCount);
+    }
+}
+```

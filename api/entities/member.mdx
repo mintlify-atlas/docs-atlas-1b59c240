@@ -1,0 +1,385 @@
+---
+title: Member
+description: API reference for the Member entity in JDA
+---
+
+Represents a Guild-specific User. Contains all guild-specific information about a User including roles, nickname, and voice status.
+
+## Overview
+
+The Member interface represents a User within the context of a specific Guild. It provides access to guild-specific properties like nickname, roles, and permissions.
+
+## Key Properties
+
+### User Information
+
+<ResponseField name="getUser()" type="User">
+  The User wrapped by this Member entity.
+  
+  ```java
+  User user = member.getUser();
+  ```
+</ResponseField>
+
+<ResponseField name="getGuild()" type="Guild">
+  The Guild in which this Member is represented.
+  
+  ```java
+  Guild guild = member.getGuild();
+  ```
+</ResponseField>
+
+<ResponseField name="getEffectiveName()" type="String">
+  The name displayed in the official Discord Client. Returns the guild nickname if present, otherwise returns the user's effective name.
+  
+  ```java
+  String displayName = member.getEffectiveName();
+  ```
+</ResponseField>
+
+<ResponseField name="getNickname()" type="String">
+  The current nickname of this Member for the parent Guild.
+  
+  Returns `null` if no nickname is set.
+  
+  ```java
+  String nickname = member.getNickname();
+  if (nickname != null) {
+      System.out.println("Nickname: " + nickname);
+  }
+  ```
+</ResponseField>
+
+### Membership Details
+
+<ResponseField name="getTimeJoined()" type="OffsetDateTime">
+  The time this Member joined the Guild.
+  
+  ```java
+  OffsetDateTime joined = member.getTimeJoined();
+  System.out.println("Joined: " + joined.toString());
+  ```
+</ResponseField>
+
+<ResponseField name="hasTimeJoined()" type="boolean">
+  Whether this member has accurate join time information. Discord doesn't always provide this when loading members.
+  
+  ```java
+  if (member.hasTimeJoined()) {
+      System.out.println("Joined: " + member.getTimeJoined());
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isBoosting()" type="boolean">
+  Returns whether this member is boosting the guild.
+  
+  ```java
+  if (member.isBoosting()) {
+      System.out.println("This member is a booster!");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getTimeBoosted()" type="OffsetDateTime">
+  The time when this member boosted the guild.
+  
+  Returns `null` if the member is not currently boosting.
+  
+  ```java
+  OffsetDateTime boostedSince = member.getTimeBoosted();
+  ```
+</ResponseField>
+
+### Roles and Permissions
+
+<ResponseField name="getRoles()" type="List<Role>">
+  The roles applied to this Member. The roles are ordered by position (highest role at index 0).
+  
+  **Note:** The @everyone role is not included in this list.
+  
+  ```java
+  List<Role> roles = member.getRoles();
+  for (Role role : roles) {
+      System.out.println(role.getName());
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getPermissions()" type="EnumSet<Permission>">
+  Gets the Permissions that this Member has in the Guild.
+  
+  ```java
+  EnumSet<Permission> permissions = member.getPermissions();
+  if (permissions.contains(Permission.ADMINISTRATOR)) {
+      System.out.println("This member is an admin!");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="hasPermission(Permission... permissions)" type="boolean">
+  Checks whether this member has the specified permissions.
+  
+  ```java
+  if (member.hasPermission(Permission.KICK_MEMBERS, Permission.BAN_MEMBERS)) {
+      System.out.println("Can moderate members");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isOwner()" type="boolean">
+  Checks whether this member is the owner of the related Guild.
+  
+  ```java
+  if (member.isOwner()) {
+      System.out.println("Guild owner");
+  }
+  ```
+</ResponseField>
+
+### Voice State
+
+<ResponseField name="getVoiceState()" type="GuildVoiceState">
+  The VoiceState of this Member.
+  
+  Returns `null` when the VOICE_STATE cache flag is disabled.
+  
+  ```java
+  GuildVoiceState voiceState = member.getVoiceState();
+  if (voiceState != null && voiceState.inAudioChannel()) {
+      System.out.println("In channel: " + voiceState.getChannel().getName());
+  }
+  ```
+</ResponseField>
+
+### Status and Activity
+
+<ResponseField name="getOnlineStatus()" type="OnlineStatus">
+  Returns the OnlineStatus of the User.
+  
+  Returns `OFFLINE` if the ONLINE_STATUS cache flag is disabled.
+  
+  ```java
+  OnlineStatus status = member.getOnlineStatus();
+  System.out.println("Status: " + status);
+  ```
+</ResponseField>
+
+<ResponseField name="getActivities()" type="List<Activity>">
+  The activities of the user.
+  
+  Requires the ACTIVITY cache flag to be enabled.
+  
+  ```java
+  List<Activity> activities = member.getActivities();
+  for (Activity activity : activities) {
+      System.out.println("Playing: " + activity.getName());
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getActiveClients()" type="EnumSet<ClientType>">
+  All active ClientTypes of this Member (web, mobile, desktop).
+  
+  Requires the CLIENT_STATUS cache flag to be enabled.
+  
+  ```java
+  EnumSet<ClientType> clients = member.getActiveClients();
+  if (clients.contains(ClientType.MOBILE)) {
+      System.out.println("User is on mobile");
+  }
+  ```
+</ResponseField>
+
+### Appearance
+
+<ResponseField name="getAvatarId()" type="String">
+  The Discord Id for this member's per-guild avatar image.
+  
+  Returns `null` if the member has not set a per-guild avatar.
+  
+  ```java
+  String avatarId = member.getAvatarId();
+  ```
+</ResponseField>
+
+<ResponseField name="getEffectiveAvatarUrl()" type="String">
+  The URL for the member's effective avatar image. Falls back to the user's avatar if no per-guild avatar is set.
+  
+  ```java
+  String avatarUrl = member.getEffectiveAvatarUrl();
+  ```
+</ResponseField>
+
+<ResponseField name="getColors()" type="RoleColors">
+  The colors of this Member's name in the Guild, determined by the highest role with a color.
+  
+  ```java
+  RoleColors colors = member.getColors();
+  Color primary = colors.getPrimary();
+  ```
+</ResponseField>
+
+### Timeout Management
+
+<ResponseField name="isTimedOut()" type="boolean">
+  Whether this Member is in timeout.
+  
+  While timed out, members can only view channels and read message history.
+  
+  ```java
+  if (member.isTimedOut()) {
+      System.out.println("Member is timed out");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getTimeOutEnd()" type="OffsetDateTime">
+  The time this Member will be released from timeout.
+  
+  Returns `null` if not in timeout.
+  
+  ```java
+  OffsetDateTime timeoutEnd = member.getTimeOutEnd();
+  ```
+</ResponseField>
+
+## Member Actions
+
+### Moderation
+
+<ParamField path="ban(int deletionTimeframe, TimeUnit unit)" type="AuditableRestAction<Void>">
+  Bans this Member from the Guild.
+  
+  ```java
+  member.ban(7, TimeUnit.DAYS)
+      .reason("Violation of rules")
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="kick()" type="AuditableRestAction<Void>">
+  Kicks this Member from the Guild.
+  
+  ```java
+  member.kick()
+      .reason("Warning issued")
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="timeoutFor(long amount, TimeUnit unit)" type="AuditableRestAction<Void>">
+  Puts this Member in timeout for a specific amount of time.
+  
+  Maximum timeout duration is 28 days.
+  
+  ```java
+  member.timeoutFor(10, TimeUnit.MINUTES)
+      .reason("Spam")
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="removeTimeout()" type="AuditableRestAction<Void>">
+  Removes a timeout from this Member.
+  
+  ```java
+  member.removeTimeout()
+      .reason("Appealed")
+      .queue();
+  ```
+</ParamField>
+
+### Voice Management
+
+<ParamField path="mute(boolean mute)" type="AuditableRestAction<Void>">
+  Sets the Guild muted state of this Member.
+  
+  Requires the member to be connected to a voice channel.
+  
+  ```java
+  member.mute(true)
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="deafen(boolean deafen)" type="AuditableRestAction<Void>">
+  Sets the Guild deafened state of this Member.
+  
+  Requires the member to be connected to a voice channel.
+  
+  ```java
+  member.deafen(true)
+      .queue();
+  ```
+</ParamField>
+
+### Profile Management
+
+<ParamField path="modifyNickname(String nickname)" type="AuditableRestAction<Void>">
+  Changes this Member's nickname in the guild.
+  
+  Provide `null` or empty string to reset the nickname.
+  
+  ```java
+  member.modifyNickname("NewNickname")
+      .queue();
+  
+  // Reset nickname
+  member.modifyNickname(null)
+      .queue();
+  ```
+</ParamField>
+
+## Usage Example
+
+```java
+// Get member information
+Member member = event.getMember();
+System.out.println("Name: " + member.getEffectiveName());
+System.out.println("Joined: " + member.getTimeJoined());
+
+// Check permissions
+if (member.hasPermission(Permission.ADMINISTRATOR)) {
+    System.out.println("This user is an administrator");
+}
+
+// Check roles
+for (Role role : member.getRoles()) {
+    System.out.println("Role: " + role.getName());
+}
+
+// Moderate member
+if (member.hasPermission(Permission.KICK_MEMBERS)) {
+    targetMember.kick()
+        .reason("Rule violation")
+        .queue();
+}
+
+// Update nickname
+member.modifyNickname("Cool Member")
+    .queue(success -> {
+        System.out.println("Nickname updated!");
+    });
+
+// Timeout member
+member.timeoutFor(1, TimeUnit.HOURS)
+    .reason("Spam")
+    .queue();
+```
+
+## Constants
+
+<ResponseField name="MAX_TIME_OUT_LENGTH" type="int">
+  Maximum number of days a Member can be timed out for: `28`
+</ResponseField>
+
+<ResponseField name="MAX_NICKNAME_LENGTH" type="int">
+  Max length of a member nickname: `32`
+</ResponseField>
+
+## See Also
+
+- [User](/api/entities/user)
+- [Guild](/api/entities/guild)
+- [Role](/api/entities/role)

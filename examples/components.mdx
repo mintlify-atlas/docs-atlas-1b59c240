@@ -1,0 +1,327 @@
+---
+title: Interactive Components V2
+description: Build rich interactive messages with buttons, menus, and media galleries
+---
+
+Components V2 introduce powerful new UI elements for creating rich, interactive Discord messages. This example demonstrates containers, sections, thumbnails, buttons, select menus, and media galleries.
+
+## Overview
+
+Components V2 enables you to create:
+- Containers with styled content (similar to embeds but more flexible)
+- Sections with thumbnails and text displays
+- Interactive buttons and select menus
+- File displays and media galleries
+- Separators for visual organization
+
+<Warning>
+  Components V2 can only be used in messages with `useComponentsV2()` enabled. This has some limitations - check the method documentation for details.
+</Warning>
+
+## Enabling Components V2
+
+<Steps>
+  <Step title="Mark message as using Components V2">
+    Any message using V2 components must call `useComponentsV2()`:
+
+    ```java
+    event.replyComponents(container)
+        .useComponentsV2()  // Required!
+        .setEphemeral(true)
+        .queue();
+    ```
+  </Step>
+
+  <Step title="Check component documentation">
+    Each component documents whether it requires the V2 flag. Components follow a type system similar to channels using "union" types.
+  </Step>
+</Steps>
+
+## Building a Container
+
+Containers are the foundation of Components V2. They hold sections, separators, and other UI elements:
+
+```java
+Container container = Container.of(
+    // A section with a thumbnail and text
+    Section.of(
+        Thumbnail.fromFile(getResourceAsFileUpload("/cv2.png")),
+        TextDisplay.of("## A container"),
+        TextDisplay.of("Quite different from embeds"),
+        TextDisplay.of("-# You can even put small text")
+    ),
+    
+    // A visual separator
+    Separator.createDivider(Separator.Spacing.SMALL),
+    
+    // Another section with a button accessory
+    Section.of(
+        Button.danger("feature_disable:moderation", "Disable moderation"),
+        TextDisplay.of("**Moderation:** Moderates the messages"),
+        TextDisplay.of("**Status:** Enabled")
+    )
+);
+```
+
+## Sections and Accessories
+
+Sections display content on the left and an "accessory" on the right:
+
+```java
+// Section with thumbnail accessory
+Section.of(
+    Thumbnail.fromFile(getResourceAsFileUpload("/image.png"))
+        .withDescription("Alternative text for accessibility"),
+    TextDisplay.of("### Title"),
+    TextDisplay.of("Description text"),
+    TextDisplay.of("-# Small footer text")
+)
+```
+
+<Note>
+  Sections can have at most 3 children (excluding the accessory). Use newlines in text displays for longer content.
+</Note>
+
+## Action Rows and Interactive Components
+
+Add buttons and select menus in action rows:
+
+```java
+ActionRow.of(
+    StringSelectMenu.create("feature")
+        .setPlaceholder("Select a module to configure")
+        .addOption("Moderation", "moderation", "Configure the moderation module")
+        .addOption("Fun", "fun", "Configure the fun module")
+        .setDefaultValues("moderation")
+        .build()
+)
+.withUniqueId(42)  // Optional: set an identifier for later reference
+```
+
+### Navigation with Buttons
+
+Create button-based navigation:
+
+```java
+ActionRow.of(
+    Button.secondary("previous", "⬅ Social Space"),
+    Button.success("back", "Back").withEmoji(backEmoji),
+    Button.secondary("next", "Prairie Village ➡")
+)
+```
+
+## File Displays and Media Galleries
+
+### File Display
+
+Show downloadable files:
+
+```java
+TextDisplay.of("Download the current configuration:"),
+FileDisplay.fromFile(
+    FileUpload.fromData("{}".getBytes(StandardCharsets.UTF_8), "config.json")
+)
+```
+
+### Media Gallery
+
+Display images in a mosaic layout:
+
+```java
+MediaGallery.of(
+    MediaGalleryItem.fromFile(getResourceAsFileUpload("/docs.gif"))
+)
+```
+
+<Tip>
+  Media galleries can display multiple items in a mosaic. With one item, it will use the maximum horizontal space based on aspect ratio.
+</Tip>
+
+## Unique IDs and Component Replacement
+
+Every component has a unique numeric ID that you can use for targeted replacements:
+
+```java
+public class MyButtonListener extends ListenerAdapter {
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        // Replace the clicked button with a disabled version
+        MessageComponentTree clickedAsDisabled = event.getMessage()
+            .getComponentTree()
+            .replace(ComponentReplacer.byId(
+                event.getButton(), 
+                event.getButton().asDisabled()
+            ));
+        event.editComponents(clickedAsDisabled).queue();
+    }
+}
+```
+
+### Disable All Components
+
+```java
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    MessageComponentTree everythingAsDisabled = event.getMessage()
+        .getComponentTree()
+        .asDisabled();
+    event.editComponents(everythingAsDisabled).queue();
+}
+```
+
+## Complete Examples
+
+### Example 1: Configuration Panel
+
+```java
+private static void onComponentsV2Sample(@Nonnull SlashCommandInteractionEvent event) {
+    Container container = Container.of(
+        Section.of(
+            Thumbnail.fromFile(getResourceAsFileUpload("/cv2.png")),
+            TextDisplay.of("## A container"),
+            TextDisplay.of("Quite different from embeds"),
+            TextDisplay.of("-# You can even put small text")
+        ),
+        
+        Separator.createDivider(Separator.Spacing.SMALL),
+        
+        Section.of(
+            Button.danger("feature_disable:moderation", "Disable moderation"),
+            TextDisplay.of("**Moderation:** Moderates the messages"),
+            TextDisplay.of("**Status:** Enabled")
+        ),
+        
+        ActionRow.of(
+            StringSelectMenu.create("feature")
+                .setPlaceholder("Select a module to configure")
+                .addOption("Moderation", "moderation", "Configure the moderation module")
+                .addOption("Fun", "fun", "Configure the fun module")
+                .setDefaultValues("moderation")
+                .build()
+        ).withUniqueId(42),
+        
+        Separator.createDivider(Separator.Spacing.SMALL),
+        
+        TextDisplay.of("Download the current configuration:"),
+        FileDisplay.fromFile(
+            FileUpload.fromData("{}".getBytes(StandardCharsets.UTF_8), "config.json")
+        ),
+        
+        MediaGallery.of(
+            MediaGalleryItem.fromFile(getResourceAsFileUpload("/docs.gif"))
+        )
+    );
+
+    event.replyComponents(container)
+        .useComponentsV2()
+        .setEphemeral(true)
+        .queue();
+}
+```
+
+### Example 2: Documentation Navigator
+
+```java
+private static void onComponentsV2Butterfly(@Nonnull SlashCommandInteractionEvent event) {
+    Container container = Container.of(
+        TextDisplay.of("Summary of Daylight Prairie"),
+        TextDisplay.of("### [Butterfly Fields](https://example.com/wiki)"),
+        
+        Separator.createDivider(Separator.Spacing.LARGE),
+        
+        Section.of(
+            Thumbnail.fromFile(getResourceAsFileUpload("/Prairie_ButterflyFields.jpg"))
+                .withDescription("Butterfly Fields"),
+            TextDisplay.of("""
+                The Butterfly Fields is a prairie field covered in bountiful fauna.
+                In the fields, players find Butterflies that can help reach
+                otherwise difficult to access places.
+                
+                *Source: [Wiki](https://example.com)*
+                -# Page 2/9
+                """)
+        ),
+        
+        TextDisplay.of(""),
+        Separator.createDivider(Separator.Spacing.SMALL),
+        
+        ActionRow.of(
+            Button.secondary("previous", "⬅ Social Space"),
+            Button.success("back", "Back").withEmoji(backEmoji),
+            Button.secondary("next", "Prairie Village ➡")
+        ),
+        
+        Separator.createDivider(Separator.Spacing.SMALL),
+        
+        ActionRow.of(
+            StringSelectMenu.create("area")
+                .addOption("Social Space", "social_space")
+                .addOption("Butterfly Fields", "butterfly_fields")
+                .addOption("Prairie Village", "prairie_village")
+                .setDefaultValues("butterfly_fields")
+                .build()
+        )
+    );
+
+    event.replyComponents(container)
+        .useComponentsV2()
+        .setEphemeral(true)
+        .queue();
+}
+```
+
+## Helper Methods
+
+### Loading Files as FileUpload
+
+```java
+@Nonnull
+private static FileUpload getResourceAsFileUpload(@Nonnull String path) {
+    int lastSeparatorIndex = path.lastIndexOf('/');
+    String fileName = path.substring(lastSeparatorIndex + 1);
+    
+    InputStream stream = ComponentsV2Example.class.getResourceAsStream(path);
+    if (stream == null) {
+        throw new IllegalArgumentException("Could not find resource at: " + path);
+    }
+    
+    return FileUpload.fromData(stream, fileName);
+}
+```
+
+### Creating Application Emojis
+
+```java
+@Nonnull
+private static ApplicationEmoji getOrCreateEmoji(
+        @Nonnull JDA jda, 
+        @Nonnull List<ApplicationEmoji> applicationEmojis, 
+        @Nonnull String path) throws IOException {
+    int lastSeparatorIndex = path.lastIndexOf('/');
+    String fileName = path.substring(lastSeparatorIndex + 1);
+    int extensionIndex = fileName.lastIndexOf('.');
+    String fileNameWithoutExtension = fileName.substring(0, extensionIndex);
+    
+    for (ApplicationEmoji emoji : applicationEmojis) {
+        if (emoji.getName().equals(fileNameWithoutExtension)) {
+            return emoji;
+        }
+    }
+    
+    return jda.createApplicationEmoji(fileNameWithoutExtension, getResourceAsIcon(path))
+        .complete();
+}
+```
+
+## Character Limits
+
+<Warning>
+  There is a character limit for the whole message. See `Message#MAX_CONTENT_LENGTH_COMPONENT_V2` for the exact limit.
+</Warning>
+
+## Related Resources
+
+- [Container Documentation](https://docs.jda.wiki/net/dv8tion/jda/api/components/container/Container.html)
+- [Section Documentation](https://docs.jda.wiki/net/dv8tion/jda/api/components/section/Section.html)
+- [Button Documentation](https://docs.jda.wiki/net/dv8tion/jda/api/components/buttons/Button.html)
+- [MediaGallery Documentation](https://docs.jda.wiki/net/dv8tion/jda/api/components/mediagallery/MediaGallery.html)

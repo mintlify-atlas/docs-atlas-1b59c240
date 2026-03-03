@@ -1,0 +1,527 @@
+---
+title: "Interaction Events"
+description: "Handle slash commands, buttons, select menus, and modal interactions in JDA"
+---
+
+## Overview
+
+Interaction events are fired when users interact with your bot through slash commands, buttons, select menus, modals, and context menus.
+
+## Requirements
+
+To receive interaction events, you must:
+
+1. **Remove the Interactions Endpoint URL** in your application dashboard at the [Discord Developer Portal](https://discord.com/developers/applications)
+2. **Handle interactions within 3 seconds** or acknowledge them with `deferReply()`
+
+```java
+JDA jda = JDABuilder.createDefault(token).build();
+```
+
+No special intents are required for interaction events.
+
+## Command Interactions
+
+### SlashCommandInteractionEvent
+
+Fired when a user executes a slash command.
+
+**Package:** `net.dv8tion.jda.api.events.interaction.command`
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    String commandName = event.getName();
+    
+    switch (commandName) {
+        case "ping":
+            long time = System.currentTimeMillis();
+            event.reply("Pong!").setEphemeral(true)
+                .flatMap(v -> event.getHook().editOriginalFormat(
+                    "Pong: %d ms", System.currentTimeMillis() - time
+                ))
+                .queue();
+            break;
+            
+        case "userinfo":
+            User user = event.getOption("user", event.getUser(), OptionMapping::getAsUser);
+            event.replyFormat("User: %s\nID: %s\nCreated: %s",
+                user.getAsTag(),
+                user.getId(),
+                user.getTimeCreated()
+            ).queue();
+            break;
+            
+        case "slowcommand":
+            // Defer reply for commands that take longer than 3 seconds
+            event.deferReply().queue();
+            
+            // Do expensive work
+            String result = doExpensiveWork();
+            
+            // Edit the deferred reply
+            event.getHook().editOriginal(result).queue();
+            break;
+    }
+}
+```
+
+**Key Methods:**
+- `getName()` - The command name
+- `getOption(String name)` - Get an option by name
+- `getOptions()` - Get all options
+- `getSubcommandName()` - Get subcommand name (if used)
+- `getSubcommandGroup()` - Get subcommand group (if used)
+- `reply(String)` - Reply to the interaction
+- `deferReply()` - Acknowledge the interaction (for slow commands)
+- `getHook()` - Get the interaction hook for editing replies
+
+### Getting Command Options
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    if (event.getName().equals("ban")) {
+        // Required option
+        User user = event.getOption("user").getAsUser();
+        
+        // Optional option with default
+        String reason = event.getOption("reason", "No reason provided", OptionMapping::getAsString);
+        int days = event.getOption("days", 0, OptionMapping::getAsInt);
+        
+        // Perform ban
+        event.getGuild().ban(user, days, TimeUnit.DAYS)
+            .reason(reason)
+            .queue(
+                success -> event.reply("Banned " + user.getAsTag()).setEphemeral(true).queue(),
+                error -> event.reply("Failed to ban: " + error.getMessage()).setEphemeral(true).queue()
+            );
+    }
+}
+```
+
+### UserContextInteractionEvent
+
+Fired when a user context menu command is used.
+
+**Package:** `net.dv8tion.jda.api.events.interaction.command`
+
+```java
+@Override
+public void onUserContextInteraction(UserContextInteractionEvent event) {
+    String commandName = event.getName();
+    User target = event.getTarget();
+    
+    if (commandName.equals("User Info")) {
+        event.replyFormat(
+            "**User Information**\n" +
+            "Name: %s\n" +
+            "ID: %s\n" +
+            "Bot: %s\n" +
+            "Created: %s",
+            target.getAsTag(),
+            target.getId(),
+            target.isBot(),
+            target.getTimeCreated()
+        ).setEphemeral(true).queue();
+    }
+}
+```
+
+**Key Methods:**
+- `getTarget()` - The user the command was used on
+- `getTargetMember()` - The member object (null in DMs)
+
+### MessageContextInteractionEvent
+
+Fired when a message context menu command is used.
+
+**Package:** `net.dv8tion.jda.api.events.interaction.command`
+
+```java
+@Override
+public void onMessageContextInteraction(MessageContextInteractionEvent event) {
+    String commandName = event.getName();
+    Message target = event.getTarget();
+    
+    if (commandName.equals("Copy Message")) {
+        event.reply("Message content: " + target.getContentRaw())
+            .setEphemeral(true)
+            .queue();
+    } else if (commandName.equals("Quote")) {
+        event.getChannel().sendMessage(
+            "> " + target.getContentRaw() + "\n\n- " + target.getAuthor().getAsMention()
+        ).queue(
+            success -> event.reply("Message quoted!").setEphemeral(true).queue()
+        );
+    }
+}
+```
+
+**Key Methods:**
+- `getTarget()` - The message the command was used on
+
+## Component Interactions
+
+### ButtonInteractionEvent
+
+Fired when a user clicks a button.
+
+**Package:** `net.dv8tion.jda.api.events.interaction.component`
+
+```java
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    String buttonId = event.getComponentId();
+    
+    switch (buttonId) {
+        case "accept_rules":
+            Role memberRole = event.getGuild().getRoleById("123456789");
+            if (memberRole != null) {
+                event.getGuild().addRoleToMember(event.getMember(), memberRole).queue();
+            }
+            event.reply("Welcome! You've accepted the rules.").setEphemeral(true).queue();
+            break;
+            
+        case "delete_message":
+            event.getMessage().delete().queue();
+            event.reply("Message deleted!").setEphemeral(true).queue();
+            break;
+            
+        case "refresh_stats":
+            event.deferEdit().queue(); // Acknowledge the button click
+            
+            String newStats = fetchLatestStats();
+            event.getHook().editOriginal(newStats).queue();
+            break;
+    }
+}
+```
+
+**Key Methods:**
+- `getComponentId()` - The custom ID of the button
+- `getButton()` - The button component
+- `getMessage()` - The message containing the button
+- `reply()` - Send a new reply
+- `deferReply()` - Defer a reply
+- `deferEdit()` - Acknowledge without sending a reply
+- `editMessage()` - Edit the message containing the button
+
+### Creating Buttons
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    if (event.getName().equals("verify")) {
+        event.reply("Please click the button to verify")
+            .addActionRow(
+                Button.success("verify_button", "Verify"),
+                Button.danger("cancel_verify", "Cancel")
+            )
+            .queue();
+    }
+}
+```
+
+### StringSelectInteractionEvent
+
+Fired when a user selects options from a string select menu.
+
+**Package:** `net.dv8tion.jda.api.events.interaction.component`
+
+```java
+@Override
+public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+    String menuId = event.getComponentId();
+    
+    if (menuId.equals("role_select")) {
+        List<String> values = event.getValues();
+        Guild guild = event.getGuild();
+        Member member = event.getMember();
+        
+        // Add selected roles
+        List<Role> rolesToAdd = new ArrayList<>();
+        for (String roleId : values) {
+            Role role = guild.getRoleById(roleId);
+            if (role != null) {
+                rolesToAdd.add(role);
+            }
+        }
+        
+        if (!rolesToAdd.isEmpty()) {
+            guild.modifyMemberRoles(member, rolesToAdd, null).queue();
+            event.reply("Roles updated!").setEphemeral(true).queue();
+        }
+    }
+}
+```
+
+**Key Methods:**
+- `getValues()` - List of selected values
+- `getSelectedOptions()` - List of `SelectOption` objects
+
+### Creating Select Menus
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    if (event.getName().equals("chooseroles")) {
+        event.reply("Select your roles:")
+            .addActionRow(
+                StringSelectMenu.create("role_select")
+                    .addOption("Gamer", "role_gamer", "For gaming discussions")
+                    .addOption("Artist", "role_artist", "For art sharing")
+                    .addOption("Developer", "role_dev", "For programming")
+                    .setMinValues(1)
+                    .setMaxValues(3)
+                    .build()
+            )
+            .setEphemeral(true)
+            .queue();
+    }
+}
+```
+
+### EntitySelectInteractionEvent
+
+Fired when a user selects entities (users, roles, channels) from an entity select menu.
+
+**Package:** `net.dv8tion.jda.api.events.interaction.component`
+
+```java
+@Override
+public void onEntitySelectInteraction(EntitySelectInteractionEvent event) {
+    String menuId = event.getComponentId();
+    
+    if (menuId.equals("user_select")) {
+        List<User> users = event.getMentions().getUsers();
+        event.reply("Selected users: " + 
+            users.stream().map(User::getAsMention).collect(Collectors.joining(", "))
+        ).setEphemeral(true).queue();
+    } else if (menuId.equals("role_select")) {
+        List<Role> roles = event.getMentions().getRoles();
+        event.reply("Selected roles: " + 
+            roles.stream().map(Role::getAsMention).collect(Collectors.joining(", "))
+        ).setEphemeral(true).queue();
+    }
+}
+```
+
+**Key Methods:**
+- `getMentions()` - Get mentions object with selected entities
+- `getValues()` - List of selected entity IDs
+
+## Modal Interactions
+
+### ModalInteractionEvent
+
+Fired when a user submits a modal (form).
+
+**Package:** `net.dv8tion.jda.api.events.interaction`
+
+```java
+@Override
+public void onModalInteraction(ModalInteractionEvent event) {
+    String modalId = event.getModalId();
+    
+    if (modalId.equals("feedback_modal")) {
+        String category = event.getValue("category").getAsString();
+        String feedback = event.getValue("feedback").getAsString();
+        
+        // Save feedback to database
+        saveFeedback(event.getUser(), category, feedback);
+        
+        event.reply("Thank you for your feedback!").setEphemeral(true).queue();
+    } else if (modalId.equals("ticket_modal")) {
+        String subject = event.getValue("subject").getAsString();
+        String description = event.getValue("description").getAsString();
+        
+        // Create ticket channel
+        createTicket(event.getGuild(), event.getMember(), subject, description);
+        
+        event.reply("Ticket created! Check your DMs.").setEphemeral(true).queue();
+    }
+}
+```
+
+**Key Methods:**
+- `getModalId()` - The custom ID of the modal
+- `getValue(String id)` - Get value of a text input by ID
+- `getValues()` - Get all text input values
+
+### Creating and Sending Modals
+
+```java
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    if (event.getComponentId().equals("feedback_button")) {
+        TextInput category = TextInput.create("category", "Category", TextInputStyle.SHORT)
+            .setPlaceholder("Bug, Feature Request, Other")
+            .setRequired(true)
+            .build();
+        
+        TextInput feedback = TextInput.create("feedback", "Feedback", TextInputStyle.PARAGRAPH)
+            .setPlaceholder("Tell us what you think...")
+            .setMinLength(10)
+            .setMaxLength(1000)
+            .setRequired(true)
+            .build();
+        
+        Modal modal = Modal.create("feedback_modal", "Submit Feedback")
+            .addActionRow(category)
+            .addActionRow(feedback)
+            .build();
+        
+        event.replyModal(modal).queue();
+    }
+}
+```
+
+## Auto-Complete Interactions
+
+### CommandAutoCompleteInteractionEvent
+
+Fired when a user types in an autocomplete-enabled option.
+
+**Package:** `net.dv8tion.jda.api.events.interaction.command`
+
+```java
+@Override
+public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
+    if (event.getName().equals("play") && event.getFocusedOption().getName().equals("song")) {
+        String userInput = event.getFocusedOption().getValue();
+        
+        // Search for songs matching user input
+        List<String> songs = searchSongs(userInput);
+        
+        List<Command.Choice> choices = songs.stream()
+            .limit(25) // Discord allows max 25 choices
+            .map(song -> new Command.Choice(song, song))
+            .collect(Collectors.toList());
+        
+        event.replyChoices(choices).queue();
+    }
+}
+```
+
+**Key Methods:**
+- `getFocusedOption()` - The option being autocompleted
+- `replyChoices()` - Send autocomplete suggestions
+
+### Registering Autocomplete Commands
+
+```java
+CommandData command = Commands.slash("play", "Play a song")
+    .addOption(OptionType.STRING, "song", "The song to play", true, true); // true = autocomplete
+
+guild.updateCommands().addCommands(command).queue();
+```
+
+## Generic Interaction Events
+
+### GenericInteractionCreateEvent
+
+Fires for all interaction types.
+
+```java
+@Override
+public void onGenericInteractionCreate(GenericInteractionCreateEvent event) {
+    System.out.println("Interaction from: " + event.getUser().getAsTag());
+    System.out.println("Type: " + event.getInteraction().getType());
+}
+```
+
+### GenericComponentInteractionCreateEvent
+
+Fires for all component interactions (buttons, select menus).
+
+```java
+@Override
+public void onGenericComponentInteractionCreate(GenericComponentInteractionCreateEvent event) {
+    System.out.println("Component interaction: " + event.getComponentId());
+}
+```
+
+## Example: Complete Interaction System
+
+```java
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.interactions.components.text.TextInput;
+import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
+import net.dv8tion.jda.api.interactions.modals.Modal;
+
+public class InteractionHandler extends ListenerAdapter {
+    @Override
+    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        if (event.getName().equals("support")) {
+            event.reply("Need help? Click the button below to create a ticket.")
+                .addActionRow(
+                    Button.primary("create_ticket", "Create Ticket")
+                )
+                .setEphemeral(true)
+                .queue();
+        }
+    }
+    
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        if (event.getComponentId().equals("create_ticket")) {
+            TextInput subject = TextInput.create("subject", "Subject", TextInputStyle.SHORT)
+                .setPlaceholder("Brief description of your issue")
+                .setRequired(true)
+                .build();
+            
+            TextInput description = TextInput.create("description", "Description", TextInputStyle.PARAGRAPH)
+                .setPlaceholder("Detailed description of your issue")
+                .setRequired(true)
+                .build();
+            
+            Modal modal = Modal.create("ticket_modal", "Create Support Ticket")
+                .addActionRow(subject)
+                .addActionRow(description)
+                .build();
+            
+            event.replyModal(modal).queue();
+        }
+    }
+    
+    @Override
+    public void onModalInteraction(ModalInteractionEvent event) {
+        if (event.getModalId().equals("ticket_modal")) {
+            String subject = event.getValue("subject").getAsString();
+            String description = event.getValue("description").getAsString();
+            
+            // Create ticket channel
+            event.getGuild().createTextChannel("ticket-" + event.getUser().getName())
+                .queue(channel -> {
+                    channel.sendMessageFormat(
+                        "**New Ticket**\n" +
+                        "Created by: %s\n" +
+                        "Subject: %s\n\n" +
+                        "Description:\n%s",
+                        event.getUser().getAsMention(),
+                        subject,
+                        description
+                    ).queue();
+                    
+                    event.reply("Ticket created: " + channel.getAsMention())
+                        .setEphemeral(true)
+                        .queue();
+                });
+        }
+    }
+}
+```
+
+## Best Practices
+
+1. **Always respond within 3 seconds** - Use `deferReply()` or `deferEdit()` for slow operations
+2. **Use ephemeral messages** - Set `.setEphemeral(true)` for private responses
+3. **Validate permissions** - Check if the user has permission before executing commands
+4. **Handle errors gracefully** - Use `.queue(success, failure)` to handle errors
+5. **Clean up components** - Disable or remove buttons/menus after use
+6. **Use specific events** - Don't rely solely on generic events

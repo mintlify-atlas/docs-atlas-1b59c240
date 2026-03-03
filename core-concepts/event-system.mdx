@@ -1,0 +1,314 @@
+---
+title: Event System
+description: Listen and respond to Discord events in real-time
+---
+
+## Overview
+
+JDA's event system allows your bot to respond to real-time events from Discord, such as messages being sent, users joining guilds, reactions being added, and much more.
+
+## Listening to Events
+
+### Using ListenerAdapter
+
+The recommended way to listen to events is by extending `ListenerAdapter`:
+
+```java
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+
+public class MyListener extends ListenerAdapter {
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (event.getAuthor().isBot()) return;
+        
+        if (event.getMessage().getContentRaw().equals("!ping")) {
+            event.getMessage().reply("Pong!").queue();
+        }
+    }
+}
+```
+
+Then register the listener:
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .addEventListeners(new MyListener())
+    .build();
+```
+
+### Using EventListener Interface
+
+For more control, implement the `EventListener` interface:
+
+```java
+import net.dv8tion.jda.api.events.GenericEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.hooks.EventListener;
+
+public class MyEventListener implements EventListener {
+    @Override
+    public void onEvent(GenericEvent event) {
+        if (event instanceof MessageReceivedEvent) {
+            MessageReceivedEvent e = (MessageReceivedEvent) event;
+            System.out.println("Message: " + e.getMessage().getContentRaw());
+        }
+    }
+}
+```
+
+## Event Hierarchy
+
+JDA events follow a hierarchy. Generic events fire for all specific events:
+
+```
+GenericEvent
+├── GenericMessageEvent
+│   ├── MessageReceivedEvent
+│   ├── MessageUpdateEvent
+│   └── MessageDeleteEvent
+├── GenericGuildEvent
+│   ├── GuildReadyEvent
+│   ├── GuildJoinEvent
+│   └── ...
+└── ...
+```
+
+You can listen to generic events to catch all related events:
+
+```java
+@Override
+public void onGenericMessage(GenericMessageEvent event) {
+    System.out.println("Some message event occurred!");
+}
+```
+
+## Common Event Types
+
+### Message Events
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    Message message = event.getMessage();
+    User author = event.getAuthor();
+    MessageChannel channel = event.getChannel();
+    
+    if (message.getContentRaw().equals("!ping")) {
+        channel.sendMessage("Pong!").queue();
+    }
+}
+
+@Override
+public void onMessageUpdate(MessageUpdateEvent event) {
+    System.out.println("Message edited: " + event.getMessage().getContentRaw());
+}
+
+@Override
+public void onMessageDelete(MessageDeleteEvent event) {
+    System.out.println("Message deleted: " + event.getMessageId());
+}
+```
+
+### Guild Member Events
+
+```java
+@Override
+public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+    Member member = event.getMember();
+    Guild guild = event.getGuild();
+    
+    System.out.println(member.getEffectiveName() + " joined " + guild.getName());
+}
+
+@Override
+public void onGuildMemberRemove(GuildMemberRemoveEvent event) {
+    User user = event.getUser();
+    System.out.println(user.getAsTag() + " left the server");
+}
+```
+
+### Interaction Events
+
+```java
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    if (event.getName().equals("ping")) {
+        event.reply("Pong!").queue();
+    }
+}
+
+@Override
+public void onButtonInteraction(ButtonInteractionEvent event) {
+    if (event.getComponentId().equals("confirm")) {
+        event.reply("Confirmed!").setEphemeral(true).queue();
+    }
+}
+```
+
+### Ready Event
+
+```java
+@Override
+public void onReady(ReadyEvent event) {
+    System.out.println("Bot is ready! Logged in as: " + event.getJDA().getSelfUser().getAsTag());
+}
+```
+
+## Registering Listeners
+
+You can register listeners at any time:
+
+```java
+// During builder
+JDABuilder.createDefault(token)
+    .addEventListeners(new Listener1(), new Listener2())
+    .build();
+
+// After JDA is built
+JDA jda = JDABuilder.createDefault(token).build();
+jda.addEventListener(new Listener3());
+
+// Remove a listener
+jda.removeEventListener(listener3);
+```
+
+## One-Time Listeners
+
+Listen to an event only once:
+
+```java
+jda.listenOnce(ReadyEvent.class).thenAccept(event -> {
+    System.out.println("Bot is ready!");
+});
+```
+
+## Gateway Intents
+
+<Warning>
+Many events require specific gateway intents to be enabled. Without the required intent, the event won't fire.
+</Warning>
+
+| Event Type | Required Intent |
+|------------|----------------|
+| Message events (guild) | `GUILD_MESSAGES` |
+| Message content access | `MESSAGE_CONTENT` (privileged) |
+| Member join/leave | `GUILD_MEMBERS` (privileged) |
+| Presence updates | `GUILD_PRESENCES` (privileged) |
+| Voice state | `GUILD_VOICE_STATES` |
+| Reactions | `GUILD_MESSAGE_REACTIONS` |
+| Direct messages | `DIRECT_MESSAGES` |
+
+Example:
+
+```java
+JDABuilder.createLight(token, EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.MESSAGE_CONTENT  // Required to read message content
+))
+.addEventListeners(new MyListener())
+.build();
+```
+
+## Best Practices
+
+<Tip>
+**Check for bots** - Most commands shouldn't respond to other bots:
+</Tip>
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    if (event.getAuthor().isBot()) return;
+    // Your logic here
+}
+```
+
+<Tip>
+**Don't block the event thread** - Long-running operations should be run asynchronously:
+</Tip>
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    // ❌ Bad - blocks event thread
+    Thread.sleep(5000);
+    
+    // ✅ Good - runs asynchronously
+    CompletableFuture.runAsync(() -> {
+        // Long operation
+    });
+}
+```
+
+<Warning>
+**Handle exceptions** - Uncaught exceptions in event listeners are logged but don't stop your bot:
+</Warning>
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    try {
+        // Your logic
+    } catch (Exception e) {
+        System.err.println("Error handling message: " + e.getMessage());
+    }
+}
+```
+
+## Complete Example
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.session.ReadyEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+import java.util.EnumSet;
+
+public class CommandBot extends ListenerAdapter {
+    public static void main(String[] args) {
+        String token = System.getenv("BOT_TOKEN");
+        
+        JDABuilder.createLight(token, EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.MESSAGE_CONTENT
+        ))
+        .addEventListeners(new CommandBot())
+        .build();
+    }
+    
+    @Override
+    public void onReady(ReadyEvent event) {
+        System.out.println("Bot is ready!");
+    }
+    
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        // Ignore bots
+        if (event.getAuthor().isBot()) return;
+        
+        Message message = event.getMessage();
+        String content = message.getContentRaw();
+        
+        // Command handling
+        if (content.equals("!ping")) {
+            event.getMessage().reply("Pong!").queue();
+        }
+        else if (content.startsWith("!echo ")) {
+            String text = content.substring(6);
+            event.getChannel().sendMessage(text).queue();
+        }
+    }
+}
+```
+
+## Related Pages
+
+- [Gateway Intents](/core-concepts/gateway-intents)
+- [Events API Overview](/api/events/overview)
+- [Message Events](/api/events/message-events)
+- [Guild Events](/api/events/guild-events)

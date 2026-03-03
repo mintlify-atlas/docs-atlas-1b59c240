@@ -1,0 +1,303 @@
+---
+title: Slash Commands
+description: Create and handle slash commands with JDA
+---
+
+## Overview
+
+Slash commands are the primary way users interact with Discord bots. JDA provides a comprehensive API for creating, registering, and handling slash commands.
+
+## Creating Slash Commands
+
+### Commands.slash()
+
+Create a slash command builder with a name and description.
+
+<ParamField path="name" type="String" required>
+  The command name, 1-32 lowercase alphanumeric characters (with dash)
+</ParamField>
+
+<ParamField path="description" type="String" required>
+  The command description, 1-100 characters
+</ParamField>
+
+```java Commands.slash():72
+SlashCommandData slash(@Nonnull String name, @Nonnull String description)
+```
+
+### Example: Basic Command
+
+```java SlashBotExample.java:55-69
+commands.addCommands(Commands.slash("ban", "Ban a user from this server. Requires permission to ban users.")
+        // USER type allows to include members of the server or other users by id
+        .addOptions(new OptionData(USER, "user", "The user to ban")
+                // This must be filled out by the command user
+                .setRequired(true))
+        // This is optional by default and does not need to be provided
+        .addOptions(new OptionData(INTEGER, "del_days", "Delete messages from the past days.")
+                // Only allow values between 0 and 7 (inclusive)
+                .setRequiredRange(0, 7))
+        // optional reason
+        .addOptions(new OptionData(STRING, "reason", "The ban reason to use (default: Banned by <user>)"))
+        // This way the command can only be executed from a guild, and not the DMs
+        .setContexts(InteractionContextType.GUILD)
+        // Only members with the BAN_MEMBERS permission are going to see this command
+        .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS)));
+```
+
+## Adding Options
+
+### addOption()
+
+Add an option to the command.
+
+<ParamField path="type" type="OptionType" required>
+  The type of option (STRING, INTEGER, BOOLEAN, USER, CHANNEL, ROLE, MENTIONABLE, NUMBER, ATTACHMENT)
+</ParamField>
+
+<ParamField path="name" type="String" required>
+  The lowercase option name, 1-32 characters
+</ParamField>
+
+<ParamField path="description" type="String" required>
+  The option description, 1-100 characters
+</ParamField>
+
+<ParamField path="required" type="boolean" default="false">
+  Whether this option is required
+</ParamField>
+
+```java SlashCommandData.java:408-410
+default SlashCommandData addOption(
+        @Nonnull OptionType type, @Nonnull String name, @Nonnull String description, boolean required)
+```
+
+### addOptions()
+
+Add multiple option data objects.
+
+<ParamField path="options" type="OptionData..." required>
+  The OptionData objects to add (max 25 options)
+</ParamField>
+
+```java SlashCommandData.java:310
+SlashCommandData addOptions(@Nonnull OptionData... options)
+```
+
+### Example: Command with Options
+
+```java SlashBotExample.java:72-78
+commands.addCommands(Commands.slash("say", "Makes the bot say what you tell it to")
+        // Allow the command to be used anywhere (Bot DMs, Guild, Friend DMs, Group DMs)
+        .setContexts(InteractionContextType.ALL)
+        // Allow the command to be installed anywhere (Guilds, Users)
+        .setIntegrationTypes(IntegrationType.ALL)
+        // you can add required options like this too
+        .addOption(STRING, "content", "What the bot should say", true));
+```
+
+## Option Configuration
+
+### OptionData Constructor
+
+Create an option with detailed configuration.
+
+<ParamField path="type" type="OptionType" required>
+  The type of this option
+</ParamField>
+
+<ParamField path="name" type="String" required>
+  The option name, 1-32 alphanumeric (with dash) lowercase characters
+</ParamField>
+
+<ParamField path="description" type="String" required>
+  The option description, 1-100 characters
+</ParamField>
+
+<ParamField path="isRequired" type="boolean" default="false">
+  Whether this option is required
+</ParamField>
+
+```java OptionData.java:139-140
+public OptionData(
+        @Nonnull OptionType type, @Nonnull String name, @Nonnull String description, boolean isRequired)
+```
+
+### setRequiredRange()
+
+Set min and max value constraints for INTEGER or NUMBER options.
+
+<ParamField path="minValue" type="long" required>
+  The minimum value (must be greater than or equal to -2^53 + 1)
+</ParamField>
+
+<ParamField path="maxValue" type="long" required>
+  The maximum value (must be less than or equal to 2^53 - 1)
+</ParamField>
+
+```java OptionData.java:704
+public OptionData setRequiredRange(long minValue, long maxValue)
+```
+
+### addChoice()
+
+Add predefined choices to STRING, INTEGER, or NUMBER options.
+
+<ParamField path="name" type="String" required>
+  The choice name shown to users (max 100 characters)
+</ParamField>
+
+<ParamField path="value" type="String/long/double" required>
+  The value received when this choice is selected
+</ParamField>
+
+```java OptionData.java:925
+public OptionData addChoice(@Nonnull String name, @Nonnull String value)
+```
+
+## Handling Slash Commands
+
+### onSlashCommandInteraction()
+
+Listen for slash command interactions.
+
+```java SlashBotExample.java:102-130
+@Override
+public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    // Only accept commands from guilds
+    if (event.getGuild() == null) {
+        return;
+    }
+    switch (event.getName()) {
+        case "ban":
+            // the "user" option is required, so it doesn't need a null-check here
+            Member member = event.getOption("user").getAsMember();
+            User user = event.getOption("user").getAsUser();
+            ban(event, user, member);
+            break;
+        case "say":
+            // content is required so no null-check here
+            say(event, event.getOption("content").getAsString());
+            break;
+        case "leave":
+            leave(event);
+            break;
+        case "prune":
+            // 2 stage command with a button prompt
+            prune(event);
+            break;
+        default:
+            event.reply("I can't handle that command right now :(")
+                    .setEphemeral(true)
+                    .queue();
+    }
+}
+```
+
+### Getting Option Values
+
+```java SlashBotExample.java:193-205
+// optional command argument, fall back to 0 if not provided
+int delDays = event.getOption(
+        "del_days",
+        0,
+        // this last part is a method reference used to "resolve" the option value
+        OptionMapping::getAsInt);
+
+// optional ban reason with a lazy evaluated fallback (supplier)
+String reason = event.getOption(
+        "reason",
+        // used if getOption("reason") is null (not provided)
+        () -> "Banned by " + event.getUser().getName(),
+        // used if getOption("reason") is not null (provided)
+        OptionMapping::getAsString);
+```
+
+## Command Configuration
+
+### setContexts()
+
+Restrict where the command can be used.
+
+<ParamField path="contexts" type="InteractionContextType..." required>
+  The contexts where this command is available (GUILD, BOT_DM, PRIVATE_CHANNEL)
+</ParamField>
+
+```java SlashCommandData.java:69-70
+default SlashCommandData setContexts(@Nonnull InteractionContextType... contexts)
+```
+
+### setDefaultPermissions()
+
+Set which permissions users need to see and use this command.
+
+<ParamField path="permission" type="DefaultMemberPermissions" required>
+  The default permissions required
+</ParamField>
+
+```java SlashCommandData.java:65
+SlashCommandData setDefaultPermissions(@Nonnull DefaultMemberPermissions permission)
+```
+
+### setIntegrationTypes()
+
+Set where the command can be installed.
+
+<ParamField path="integrationTypes" type="IntegrationType..." required>
+  The integration types (GUILD_INSTALL, USER_INSTALL)
+</ParamField>
+
+```java SlashCommandData.java:79-80
+default SlashCommandData setIntegrationTypes(@Nonnull IntegrationType... integrationTypes)
+```
+
+## Subcommands
+
+### addSubcommands()
+
+Add subcommands to create command groups.
+
+<ParamField path="subcommands" type="SubcommandData..." required>
+  The subcommands to add (max 25)
+</ParamField>
+
+```java SlashCommandData.java:478
+SlashCommandData addSubcommands(@Nonnull SubcommandData... subcommands)
+```
+
+<Note>
+  Commands with subcommands cannot have options. You must choose between options or subcommands/subcommand groups.
+</Note>
+
+## Registering Commands
+
+### Global Commands
+
+```java SlashBotExample.java:52-98
+CommandListUpdateAction commands = jda.updateCommands();
+
+commands.addCommands(
+    Commands.slash("ban", "Ban a user from this server")
+        .addOptions(new OptionData(USER, "user", "The user to ban").setRequired(true))
+);
+
+// Send commands to Discord
+commands.queue();
+```
+
+### Guild Commands
+
+```java
+Guild guild = jda.getGuildById("123456789");
+guild.updateCommands()
+    .addCommands(Commands.slash("admin", "Admin only command"))
+    .queue();
+```
+
+## Constants
+
+- `Commands.MAX_SLASH_COMMANDS` - Maximum of 100 global or guild slash commands
+- `OptionData.MAX_NAME_LENGTH` - 32 characters for option names
+- `OptionData.MAX_DESCRIPTION_LENGTH` - 100 characters for option descriptions
+- `OptionData.MAX_CHOICES` - 25 choices per option
+- `CommandData.MAX_OPTIONS` - 25 options per command

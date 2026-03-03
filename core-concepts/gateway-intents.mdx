@@ -1,0 +1,232 @@
+---
+title: Gateway Intents
+description: Control which events your bot receives from Discord
+---
+
+## Overview
+
+Gateway Intents allow you to specify which events your bot wants to receive from Discord. This reduces bandwidth and improves performance by only receiving events you actually need.
+
+## Why Intents Matter
+
+<Info>
+Intents were introduced by Discord to help bots scale more efficiently. Instead of receiving all events from all guilds, you specify exactly which event categories you need.
+</Info>
+
+Benefits:
+- **Reduced bandwidth** - Only receive events you need
+- **Better performance** - Less processing overhead
+- **Privacy** - Don't receive sensitive data you don't use
+
+## Privileged Intents
+
+Three intents are marked as **privileged** and require special approval:
+
+### GUILD_MEMBERS
+
+<Warning>
+Required for member caching and chunking. Must be enabled in Discord Developer Portal.
+</Warning>
+
+Provides:
+- Member join/leave events
+- Member update events (nickname, roles, etc.)
+- Ability to chunk (load all members) in large guilds
+
+```java
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_MEMBERS)
+    .setMemberCachePolicy(MemberCachePolicy.ALL)
+    .setChunkingFilter(ChunkingFilter.ALL)
+    .build();
+```
+
+### GUILD_PRESENCES
+
+<Warning>
+Very heavy intent! Generates 99% of gateway traffic. Only enable if absolutely necessary.
+</Warning>
+
+Provides:
+- Online status updates (online, idle, dnd, offline)
+- User activities ("Playing...", "Streaming...", etc.)
+- Client type information (mobile, desktop, web)
+
+```java
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_PRESENCES)
+    .enableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+    .build();
+```
+
+### MESSAGE_CONTENT
+
+<Warning>
+Required to read message content, embeds, attachments, and components. Must be enabled for message-based commands.
+</Warning>
+
+Provides:
+- Message content (the actual text)
+- Message embeds
+- Message attachments
+- Message components (buttons, select menus)
+
+```java
+JDABuilder.createLight(token, EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.MESSAGE_CONTENT  // Privileged!
+))
+.build();
+```
+
+<Tip>
+Slash commands don't require `MESSAGE_CONTENT` - they work with `DEFAULT` intents!
+</Tip>
+
+## Standard Intents
+
+These intents don't require special approval:
+
+| Intent | Purpose |
+|--------|--------|
+| `GUILDS` | Guild create/update/delete events (always enabled) |
+| `GUILD_MODERATION` | Ban/unban events, audit log entries |
+| `GUILD_EXPRESSIONS` | Emoji, sticker, soundboard changes |
+| `GUILD_WEBHOOKS` | Webhook create/update/delete |
+| `GUILD_INVITES` | Invite create/delete |
+| `GUILD_VOICE_STATES` | Voice state changes (required for voice!) |
+| `GUILD_MESSAGES` | Message events in guilds |
+| `GUILD_MESSAGE_REACTIONS` | Reaction add/remove in guilds |
+| `GUILD_MESSAGE_TYPING` | Typing indicators in guilds |
+| `DIRECT_MESSAGES` | Message events in DMs |
+| `DIRECT_MESSAGE_REACTIONS` | Reaction events in DMs |
+| `DIRECT_MESSAGE_TYPING` | Typing indicators in DMs |
+| `SCHEDULED_EVENTS` | Guild scheduled event changes |
+| `AUTO_MODERATION_CONFIGURATION` | AutoMod rule changes |
+| `AUTO_MODERATION_EXECUTION` | AutoMod action executions |
+
+## Common Configurations
+
+### Slash Command Bot
+
+```java
+// Minimal - works with just defaults
+JDABuilder.createDefault(token)
+    .build();
+
+// Or even lighter
+JDABuilder.createLight(token, Collections.emptyList())
+    .build();
+```
+
+### Message Logger Bot
+
+```java
+JDABuilder.createLight(token, EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.MESSAGE_CONTENT,  // Privileged!
+    GatewayIntent.DIRECT_MESSAGES
+))
+.build();
+```
+
+### Moderation Bot
+
+```java
+JDABuilder.createDefault(token)
+    .enableIntents(
+        GatewayIntent.GUILD_MEMBERS,      // Privileged!
+        GatewayIntent.GUILD_MODERATION,
+        GatewayIntent.MESSAGE_CONTENT     // Privileged!
+    )
+    .setMemberCachePolicy(MemberCachePolicy.ALL)
+    .build();
+```
+
+### Music Bot
+
+```java
+JDABuilder.createLight(token, EnumSet.of(
+    GatewayIntent.GUILD_VOICE_STATES  // Required for voice!
+))
+.build();
+```
+
+### Voice Activity Tracker
+
+```java
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_VOICE_STATES)
+    .enableCache(CacheFlag.VOICE_STATE)
+    .setMemberCachePolicy(MemberCachePolicy.VOICE)
+    .build();
+```
+
+## Intent and Cache Relationship
+
+<Warning>
+Some cache flags require specific intents. If the intent is disabled, the cache flag is automatically disabled.
+</Warning>
+
+| Cache Flag | Required Intent |
+|------------|----------------|
+| `MEMBER_OVERRIDES` | `GUILD_MEMBERS` |
+| `VOICE_STATE` | `GUILD_VOICE_STATES` |
+| `EMOJI` | `GUILD_EXPRESSIONS` |
+| `STICKER` | `GUILD_EXPRESSIONS` |
+| `ACTIVITY` | `GUILD_PRESENCES` |
+| `CLIENT_STATUS` | `GUILD_PRESENCES` |
+| `ONLINE_STATUS` | `GUILD_PRESENCES` |
+
+## Default Intent Set
+
+The `GatewayIntent.DEFAULT` constant includes:
+
+```java
+public static final int DEFAULT = 
+    getRaw(GUILDS, GUILD_MODERATION, GUILD_EXPRESSIONS,
+           GUILD_WEBHOOKS, GUILD_INVITES, GUILD_VOICE_STATES,
+           GUILD_MESSAGES, GUILD_MESSAGE_REACTIONS,
+           DIRECT_MESSAGES, DIRECT_MESSAGE_REACTIONS,
+           GUILD_MESSAGE_TYPING, DIRECT_MESSAGE_TYPING,
+           SCHEDULED_EVENTS, AUTO_MODERATION_CONFIGURATION,
+           AUTO_MODERATION_EXECUTION);
+```
+
+**Not included** (must be explicitly enabled):
+- `GUILD_MEMBERS` (privileged)
+- `GUILD_PRESENCES` (privileged)
+- `MESSAGE_CONTENT` (privileged)
+
+## Enabling Privileged Intents
+
+<Steps>
+  <Step title="Open Discord Developer Portal">
+    Go to https://discord.com/developers/applications and select your application.
+  </Step>
+  
+  <Step title="Navigate to Bot Settings">
+    Click on **Bot** in the left sidebar.
+  </Step>
+  
+  <Step title="Enable Privileged Intents">
+    Scroll down to **Privileged Gateway Intents** and toggle on:
+    - **Presence Intent** (for `GUILD_PRESENCES`)
+    - **Server Members Intent** (for `GUILD_MEMBERS`)
+    - **Message Content Intent** (for `MESSAGE_CONTENT`)
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Save Changes** at the bottom.
+  </Step>
+</Steps>
+
+<Note>
+Bots in 100+ guilds require verification and approval from Discord before privileged intents can be enabled.
+</Note>
+
+## Related Pages
+
+- [JDABuilder](/core-concepts/jda-builder)
+- [Caching](/core-concepts/caching)
+- [Event System](/core-concepts/event-system)

@@ -1,0 +1,375 @@
+---
+title: Select Menu Components
+description: Create dropdown select menus for user input in Discord messages
+---
+
+## Overview
+
+Select menus (also known as dropdown menus) allow users to choose one or more options from a list. JDA supports string select menus and entity select menus for users, roles, channels, and mentionables.
+
+## String Select Menus
+
+### StringSelectMenu.create()
+
+Create a new string select menu builder.
+
+<ParamField path="customId" type="String" required>
+  The custom ID used to identify this menu (max 100 characters)
+</ParamField>
+
+```java StringSelectMenu.java:135-136
+static Builder create(@Nonnull String customId)
+```
+
+### Example: Basic Select Menu
+
+```java StringSelectMenu.java:47-60
+StringSelectMenu menu = StringSelectMenu.create("menu:class")
+  .setPlaceholder("Choose your class") // shows the placeholder indicating what this menu is for
+  .setRequiredRange(1, 1) // exactly one must be selected
+  .addOption("Arcane Mage", "mage-arcane")
+  .addOption("Fire Mage", "mage-fire")
+  .addOption("Frost Mage", "mage-frost")
+  .setDefaultValues("mage-fire") // default to fire mage
+  .build();
+
+event.reply("Please pick your class below")
+  .setEphemeral(true)
+  .addComponents(ActionRow.of(menu))
+  .queue();
+```
+
+### Example: Feature Configuration Menu
+
+```java ComponentsV2Example.java:176-182
+ActionRow.of(
+        // For the sake of the example, this select menu will do nothing.
+        StringSelectMenu.create("feature")
+                .setPlaceholder("Select a module to configure")
+                .addOption("Moderation", "moderation", "Configure the moderation module")
+                .addOption("Fun", "fun", "Configure the fun module")
+                .setDefaultValues("moderation")
+                .build())
+```
+
+## Building Select Menus
+
+### addOption()
+
+Add a single option to the select menu.
+
+<ParamField path="label" type="String" required>
+  The option label shown to users (max 100 characters)
+</ParamField>
+
+<ParamField path="value" type="String" required>
+  The value received when selected (max 100 characters)
+</ParamField>
+
+<ParamField path="description" type="String">
+  Optional description shown below the label
+</ParamField>
+
+```java
+Builder addOption(@Nonnull String label, @Nonnull String value, @Nullable String description)
+```
+
+### addOptions()
+
+Add multiple SelectOption objects.
+
+<ParamField path="options" type="SelectOption..." required>
+  The options to add (max 25 total)
+</ParamField>
+
+```java StringSelectMenu.java:163-164
+Builder addOptions(@Nonnull SelectOption... options)
+```
+
+### setPlaceholder()
+
+Set the placeholder text shown when no option is selected.
+
+<ParamField path="placeholder" type="String" required>
+  The placeholder text (max 150 characters)
+</ParamField>
+
+```java
+Builder setPlaceholder(@Nonnull String placeholder)
+```
+
+### setRequiredRange()
+
+Set the minimum and maximum number of options that can be selected.
+
+<ParamField path="min" type="int" required>
+  Minimum selections (1-25)
+</ParamField>
+
+<ParamField path="max" type="int" required>
+  Maximum selections (1-25)
+</ParamField>
+
+```java
+Builder setRequiredRange(int min, int max)
+```
+
+### setDefaultValues()
+
+Set which options are selected by default.
+
+<ParamField path="values" type="String..." required>
+  The values of options to select by default
+</ParamField>
+
+```java
+Builder setDefaultValues(@Nonnull String... values)
+```
+
+## Select Options
+
+### SelectOption.of()
+
+Create a select menu option.
+
+<ParamField path="label" type="String" required>
+  The label displayed to users
+</ParamField>
+
+<ParamField path="value" type="String" required>
+  The value received when this option is selected
+</ParamField>
+
+```java
+static SelectOption of(@Nonnull String label, @Nonnull String value)
+```
+
+### withEmoji()
+
+Add an emoji to the option.
+
+<ParamField path="emoji" type="Emoji" required>
+  The emoji to display
+</ParamField>
+
+```java
+SelectOption withEmoji(@Nullable Emoji emoji)
+```
+
+### withDescription()
+
+Add a description to the option.
+
+<ParamField path="description" type="String" required>
+  The description text
+</ParamField>
+
+```java
+SelectOption withDescription(@Nullable String description)
+```
+
+### withDefault()
+
+Mark this option as selected by default.
+
+<ParamField path="isDefault" type="boolean" required>
+  Whether this option is selected by default
+</ParamField>
+
+```java
+SelectOption withDefault(boolean isDefault)
+```
+
+## Example: Multi-Select Menu
+
+```java
+StringSelectMenu menu = StringSelectMenu.create("roles")
+    .setPlaceholder("Select your roles")
+    .setRequiredRange(0, 3) // allow 0 to 3 selections
+    .addOption("Developer", "role:dev", "Software developer role")
+    .addOption("Designer", "role:design", "Designer role")
+    .addOption("Manager", "role:manager", "Project manager role")
+    .build();
+
+event.reply("Choose up to 3 roles")
+    .addComponents(ActionRow.of(menu))
+    .queue();
+```
+
+## Handling Select Menu Interactions
+
+### onStringSelectInteraction()
+
+Listen for string select menu interactions.
+
+```java
+@Override
+public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+    if (event.getComponentId().equals("menu:class")) {
+        String className = event.getValues().get(0);
+        event.reply("You selected: " + className)
+            .setEphemeral(true)
+            .queue();
+    }
+}
+```
+
+### Getting Selected Values
+
+```java
+// Get all selected values
+List<String> values = event.getValues();
+
+// Get the first selected value
+String firstValue = event.getValues().get(0);
+
+// Get selected options with labels and descriptions
+List<SelectOption> selectedOptions = event.getSelectedOptions();
+```
+
+## Entity Select Menus
+
+Entity select menus allow users to select Discord entities like users, roles, or channels.
+
+### EntitySelectMenu.create()
+
+Create an entity select menu.
+
+<ParamField path="customId" type="String" required>
+  The custom ID for this menu
+</ParamField>
+
+<ParamField path="targets" type="EntitySelectMenu.SelectTarget..." required>
+  The types of entities to allow (USER, ROLE, CHANNEL)
+</ParamField>
+
+```java
+EntitySelectMenu menu = EntitySelectMenu.create(
+    "select:members",
+    EntitySelectMenu.SelectTarget.USER
+)
+    .setPlaceholder("Select a user")
+    .setRequiredRange(1, 1)
+    .build();
+```
+
+### Example: User Select Menu
+
+```java
+EntitySelectMenu userSelect = EntitySelectMenu.create(
+    "select:user",
+    EntitySelectMenu.SelectTarget.USER
+)
+    .setPlaceholder("Select a user to mention")
+    .build();
+
+event.reply("Who would you like to mention?")
+    .addComponents(ActionRow.of(userSelect))
+    .queue();
+```
+
+### Example: Channel Select Menu
+
+```java
+EntitySelectMenu channelSelect = EntitySelectMenu.create(
+    "select:channel",
+    EntitySelectMenu.SelectTarget.CHANNEL
+)
+    .setPlaceholder("Select a channel")
+    .setChannelTypes(ChannelType.TEXT, ChannelType.NEWS)
+    .build();
+```
+
+## Select Menu Properties
+
+### getOptions()
+
+Get the list of options (string select only).
+
+```java StringSelectMenu.java:96-97
+@Nonnull
+List<SelectOption> getOptions()
+```
+
+### getPlaceholder()
+
+Get the placeholder text.
+
+```java
+@Nullable
+String getPlaceholder()
+```
+
+### getMinValues()
+
+Get the minimum number of required selections.
+
+```java
+int getMinValues()
+```
+
+### getMaxValues()
+
+Get the maximum number of allowed selections.
+
+```java
+int getMaxValues()
+```
+
+### getCustomId()
+
+Get the custom ID for this select menu.
+
+```java
+@Nonnull
+String getCustomId()
+```
+
+## Disabling Select Menus
+
+### asDisabled() / asEnabled()
+
+Disable or enable the select menu.
+
+```java StringSelectMenu.java:69-77
+default StringSelectMenu asDisabled() {
+    return (StringSelectMenu) SelectMenu.super.asDisabled();
+}
+
+default StringSelectMenu asEnabled() {
+    return (StringSelectMenu) SelectMenu.super.asEnabled();
+}
+```
+
+## Action Rows
+
+Select menus take up an entire action row and cannot be combined with other components in the same row.
+
+```java
+event.reply("Configuration")
+    .addComponents(
+        ActionRow.of(selectMenu),  // Select menu takes entire row
+        ActionRow.of(button1, button2, button3)  // Buttons in separate row
+    )
+    .queue();
+```
+
+## Constants
+
+- `SelectMenu.OPTIONS_MAX_AMOUNT` - Maximum of 25 options per select menu
+- `SelectMenu.ID_MAX_LENGTH` - 100 characters maximum for custom IDs
+- `SelectMenu.PLACEHOLDER_MAX_LENGTH` - 150 characters for placeholder text
+
+## Best Practices
+
+<Tip>
+  Use `setRequiredRange(1, 1)` when you want users to select exactly one option, making it clear that selection is mandatory.
+</Tip>
+
+<Warning>
+  Select menus must have at least one option before building. The builder will throw an exception if you try to build an empty select menu.
+</Warning>
+
+<Note>
+  User selections are session-specific and disappear when the client is restarted or the message is reloaded. Always handle the interaction to persist the selection.
+</Note>

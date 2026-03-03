@@ -1,0 +1,185 @@
+---
+title: JDABuilder
+description: Configure and build JDA instances with the builder pattern
+---
+
+## Overview
+
+The `JDABuilder` class is the primary way to create and configure JDA instances. It uses the builder pattern to provide a fluent API for configuration.
+
+## Builder Presets
+
+JDA provides three builder presets to match common use cases:
+
+### createDefault()
+
+Recommended for most bots. Provides balanced caching and event access.
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .addEventListeners(new MyListener())
+    .build();
+```
+
+**Configuration:**
+- Uses `GatewayIntent.DEFAULT` intents
+- `MemberCachePolicy.DEFAULT` (caches voice members)
+- `ChunkingFilter.NONE` (no member chunking)
+- Disables `CacheFlag.ACTIVITY` and `CacheFlag.CLIENT_STATUS`
+
+### createLight()
+
+Minimal caching and resource usage. Best for lightweight bots.
+
+```java
+JDA jda = JDABuilder.createLight(token, EnumSet.of(
+        GatewayIntent.GUILD_MESSAGES,
+        GatewayIntent.MESSAGE_CONTENT
+    ))
+    .addEventListeners(new MyListener())
+    .build();
+```
+
+**Configuration:**
+- You specify which intents to enable
+- `MemberCachePolicy.NONE` (no member caching)
+- `ChunkingFilter.NONE`
+- Disables all cache flags
+
+### create()
+
+Maximum caching. Use when you need access to all guild members.
+
+```java
+JDA jda = JDABuilder.create(token, EnumSet.of(
+        GatewayIntent.GUILDS,
+        GatewayIntent.GUILD_MEMBERS,
+        GatewayIntent.GUILD_MESSAGES,
+        GatewayIntent.MESSAGE_CONTENT
+    ))
+    .addEventListeners(new MyListener())
+    .build();
+```
+
+**Configuration:**
+- You specify which intents to enable (typically all you need)
+- `MemberCachePolicy.ALL` (caches all members)
+- `ChunkingFilter.ALL` (requests all members)
+- Enables all cache flags
+
+<Warning>
+Using `create()` requires the privileged `GUILD_MEMBERS` intent to be enabled in your Discord Developer Portal.
+</Warning>
+
+## Common Configuration
+
+### Event Listeners
+
+Add event listeners to handle Discord events:
+
+```java
+JDABuilder.createDefault(token)
+    .addEventListeners(new MessageListener())
+    .addEventListeners(new ReactionListener(), new VoiceListener())
+    .build();
+```
+
+### Gateway Intents
+
+Control which events your bot receives:
+
+```java
+JDABuilder.createDefault(token)
+    // Enable additional intents
+    .enableIntents(GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
+    // Disable intents you don't need
+    .disableIntents(GatewayIntent.GUILD_MESSAGE_TYPING)
+    .build();
+```
+
+### Cache Configuration
+
+Control what JDA caches in memory:
+
+```java
+JDABuilder.createDefault(token)
+    // Enable specific cache flags
+    .enableCache(CacheFlag.VOICE_STATE, CacheFlag.EMOJI)
+    // Disable flags you don't need
+    .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+    // Set member cache policy
+    .setMemberCachePolicy(MemberCachePolicy.VOICE)
+    .build();
+```
+
+### Presence and Status
+
+Set your bot's presence:
+
+```java
+JDABuilder.createDefault(token)
+    .setActivity(Activity.playing("with Java"))
+    .setStatus(OnlineStatus.ONLINE)
+    .build();
+```
+
+### Thread Pools
+
+Customize thread pool configuration for advanced use cases:
+
+```java
+ScheduledExecutorService pool = Executors.newScheduledThreadPool(10);
+
+JDABuilder.createDefault(token)
+    .setCallbackPool(pool)
+    .setGatewayPool(pool)
+    .build();
+```
+
+## Complete Example
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.ChunkingFilter;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
+
+import java.util.EnumSet;
+
+public class MyBot {
+    public static void main(String[] args) throws InterruptedException {
+        String token = System.getenv("BOT_TOKEN");
+        
+        JDA jda = JDABuilder.createDefault(token)
+            // Enable intents
+            .enableIntents(
+                GatewayIntent.MESSAGE_CONTENT,
+                GatewayIntent.GUILD_MEMBERS
+            )
+            // Configure caching
+            .setMemberCachePolicy(MemberCachePolicy.ALL)
+            .setChunkingFilter(ChunkingFilter.ALL)
+            .enableCache(CacheFlag.VOICE_STATE)
+            // Set presence
+            .setActivity(Activity.playing("with JDA"))
+            // Add listeners
+            .addEventListeners(new MyEventListener())
+            // Build
+            .build();
+        
+        // Wait for JDA to be ready
+        jda.awaitReady();
+        
+        System.out.println("Bot is ready!");
+    }
+}
+```
+
+## Related Pages
+
+- [Gateway Intents](/core-concepts/gateway-intents)
+- [Caching](/core-concepts/caching)
+- [Event System](/core-concepts/event-system)

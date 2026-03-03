@@ -1,0 +1,371 @@
+---
+title: "Message Events"
+description: "Message-related events in JDA including messages, reactions, and polls"
+---
+
+## Overview
+
+Message events are fired when messages are created, updated, deleted, or when users interact with them through reactions or polls.
+
+## Required Intents
+
+Message events require the following Gateway Intents:
+
+- `GUILD_MESSAGES` - For messages in guild channels
+- `DIRECT_MESSAGES` - For messages in DMs
+- `MESSAGE_CONTENT` - For accessing message content (privileged)
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .enableIntents(
+        GatewayIntent.GUILD_MESSAGES,
+        GatewayIntent.DIRECT_MESSAGES,
+        GatewayIntent.MESSAGE_CONTENT
+    )
+    .build();
+```
+
+## Message Lifecycle Events
+
+### MessageReceivedEvent
+
+Fired when a message is sent in a channel your bot has access to.
+
+**Package:** `net.dv8tion.jda.api.events.message`
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    Message message = event.getMessage();
+    User author = event.getAuthor();
+    MessageChannel channel = event.getChannel();
+    
+    // Check if message is from a bot
+    if (event.isWebhookMessage()) {
+        System.out.println("Message from webhook");
+        return;
+    }
+    
+    // Get member (null in DMs)
+    Member member = event.getMember();
+    if (member != null) {
+        System.out.println("Guild message from: " + member.getEffectiveName());
+    }
+    
+    // Access message content
+    String content = message.getContentRaw();
+    System.out.println("Message: " + content);
+}
+```
+
+**Key Methods:**
+- `getMessage()` - The message that was received
+- `getAuthor()` - The user who sent the message
+- `getMember()` - The member who sent the message (null in DMs)
+- `getChannel()` - The channel where the message was sent
+- `isWebhookMessage()` - Whether the message was sent by a webhook
+
+### MessageUpdateEvent
+
+Fired when a message is edited.
+
+**Package:** `net.dv8tion.jda.api.events.message`
+
+```java
+@Override
+public void onMessageUpdate(MessageUpdateEvent event) {
+    Message message = event.getMessage();
+    
+    System.out.println("Message updated: " + event.getMessageId());
+    System.out.println("New content: " + message.getContentRaw());
+    
+    // Check if message was edited
+    if (message.isEdited()) {
+        System.out.println("Edited at: " + message.getTimeEdited());
+    }
+}
+```
+
+**Key Methods:**
+- `getMessage()` - The updated message
+- `getMessageId()` / `getMessageIdLong()` - The message ID
+- `getChannel()` - The channel containing the message
+
+### MessageDeleteEvent
+
+Fired when a message is deleted.
+
+**Package:** `net.dv8tion.jda.api.events.message`
+
+```java
+@Override
+public void onMessageDelete(MessageDeleteEvent event) {
+    long messageId = event.getMessageIdLong();
+    MessageChannel channel = event.getChannel();
+    
+    System.out.println("Message " + messageId + " deleted in " + channel.getName());
+}
+```
+
+**Note:** This event only provides the message ID, not the full message object, as the message has been deleted.
+
+**Key Methods:**
+- `getMessageId()` / `getMessageIdLong()` - The deleted message ID
+- `getChannel()` - The channel where the message was deleted
+
+### MessageBulkDeleteEvent
+
+Fired when multiple messages are deleted at once (bulk delete).
+
+**Package:** `net.dv8tion.jda.api.events.message`
+
+```java
+@Override
+public void onMessageBulkDelete(MessageBulkDeleteEvent event) {
+    List<String> messageIds = event.getMessageIds();
+    int count = event.getMessageIds().size();
+    
+    System.out.println(count + " messages were bulk deleted");
+    System.out.println("Deleted IDs: " + messageIds);
+}
+```
+
+**Key Methods:**
+- `getMessageIds()` - List of deleted message IDs
+- `getChannel()` - The channel where messages were deleted
+
+## Reaction Events
+
+Reaction events fire when users add or remove reactions from messages.
+
+### MessageReactionAddEvent
+
+Fired when a user adds a reaction to a message.
+
+**Package:** `net.dv8tion.jda.api.events.message.react`
+
+```java
+@Override
+public void onMessageReactionAdd(MessageReactionAddEvent event) {
+    User user = event.getUser();
+    MessageReaction.ReactionEmoji emoji = event.getReaction().getEmoji();
+    
+    // Handle custom emoji
+    if (emoji.getType() == MessageReaction.ReactionEmoji.Type.CUSTOM) {
+        System.out.println("Custom emoji: " + emoji.getName());
+    } else {
+        // Unicode emoji
+        System.out.println("Unicode emoji: " + emoji.getAsReactionCode());
+    }
+    
+    // Retrieve the message
+    event.retrieveMessage().queue(message -> {
+        System.out.println("Reaction added to: " + message.getContentRaw());
+    });
+}
+```
+
+**Key Methods:**
+- `getUser()` - The user who added the reaction
+- `getUserIdLong()` - The user ID
+- `getReaction()` - The reaction that was added
+- `getEmoji()` - The emoji of the reaction
+- `retrieveMessage()` - Retrieves the full message (RestAction)
+
+### MessageReactionRemoveEvent
+
+Fired when a user removes a reaction from a message.
+
+**Package:** `net.dv8tion.jda.api.events.message.react`
+
+```java
+@Override
+public void onMessageReactionRemove(MessageReactionRemoveEvent event) {
+    User user = event.getUser();
+    MessageReaction.ReactionEmoji emoji = event.getReaction().getEmoji();
+    
+    System.out.println(user.getName() + " removed reaction: " + emoji.getName());
+}
+```
+
+### MessageReactionRemoveAllEvent
+
+Fired when all reactions are removed from a message.
+
+**Package:** `net.dv8tion.jda.api.events.message.react`
+
+```java
+@Override
+public void onMessageReactionRemoveAll(MessageReactionRemoveAllEvent event) {
+    long messageId = event.getMessageIdLong();
+    System.out.println("All reactions removed from message: " + messageId);
+}
+```
+
+### MessageReactionRemoveEmojiEvent
+
+Fired when all reactions of a specific emoji are removed from a message.
+
+**Package:** `net.dv8tion.jda.api.events.message.react`
+
+```java
+@Override
+public void onMessageReactionRemoveEmoji(MessageReactionRemoveEmojiEvent event) {
+    MessageReaction.ReactionEmoji emoji = event.getReaction().getEmoji();
+    long count = event.getReaction().getCount();
+    
+    System.out.println("All " + emoji.getName() + " reactions removed (" + count + ")");
+}
+```
+
+## Poll Events
+
+Poll events fire when users vote on message polls.
+
+### MessagePollVoteAddEvent
+
+Fired when a user votes in a poll.
+
+**Package:** `net.dv8tion.jda.api.events.message.poll`
+
+```java
+@Override
+public void onMessagePollVoteAdd(MessagePollVoteAddEvent event) {
+    long answerId = event.getAnswerId();
+    User user = event.getUser();
+    
+    System.out.println(user.getName() + " voted for answer: " + answerId);
+    
+    // Retrieve the message to get poll details
+    event.retrieveMessage().queue(message -> {
+        MessagePoll poll = message.getPoll();
+        if (poll != null) {
+            System.out.println("Poll: " + poll.getQuestion().getText());
+        }
+    });
+}
+```
+
+**Key Methods:**
+- `getAnswerId()` - The ID of the poll answer
+- `getUser()` - The user who voted
+- `getMessageIdLong()` - The message containing the poll
+- `retrieveMessage()` - Retrieves the full message
+
+### MessagePollVoteRemoveEvent
+
+Fired when a user removes their vote from a poll.
+
+**Package:** `net.dv8tion.jda.api.events.message.poll`
+
+```java
+@Override
+public void onMessagePollVoteRemove(MessagePollVoteRemoveEvent event) {
+    long answerId = event.getAnswerId();
+    User user = event.getUser();
+    
+    System.out.println(user.getName() + " removed vote from answer: " + answerId);
+}
+```
+
+## Generic Message Events
+
+### GenericMessageEvent
+
+Base event for all message-related events.
+
+```java
+@Override
+public void onGenericMessage(GenericMessageEvent event) {
+    // Fires for all message events
+    System.out.println("Message event type: " + event.getClass().getSimpleName());
+}
+```
+
+### GenericMessageReactionEvent
+
+Base event for all reaction-related events.
+
+```java
+@Override
+public void onGenericMessageReaction(GenericMessageReactionEvent event) {
+    // Fires for all reaction events
+    MessageReaction.ReactionEmoji emoji = event.getReaction().getEmoji();
+    System.out.println("Reaction event for: " + emoji.getName());
+}
+```
+
+### GenericMessagePollVoteEvent
+
+Base event for all poll vote events.
+
+```java
+@Override
+public void onGenericMessagePollVote(GenericMessagePollVoteEvent event) {
+    // Fires for all poll vote events
+    System.out.println("Poll vote event for answer: " + event.getAnswerId());
+}
+```
+
+## Example: Command Handler
+
+Here's a complete example of a simple command handler using message events:
+
+```java
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+
+public class CommandHandler extends ListenerAdapter {
+    private static final String PREFIX = "!";
+    
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        // Ignore bots
+        if (event.getAuthor().isBot()) return;
+        
+        String content = event.getMessage().getContentRaw();
+        
+        // Check for prefix
+        if (!content.startsWith(PREFIX)) return;
+        
+        // Parse command
+        String[] parts = content.substring(PREFIX.length()).split("\\s+");
+        String command = parts[0].toLowerCase();
+        
+        switch (command) {
+            case "ping":
+                event.getChannel().sendMessage("Pong!").queue();
+                break;
+                
+            case "info":
+                event.getChannel().sendMessage(
+                    "Message from: " + event.getAuthor().getAsTag() +
+                    "\nChannel: " + event.getChannel().getName()
+                ).queue();
+                break;
+                
+            case "react":
+                event.getMessage().addReaction(event.getJDA()
+                    .getEmojiById("123456789")).queue();
+                break;
+        }
+    }
+}
+```
+
+## Tips and Best Practices
+
+1. **Cache Messages** - Message objects are not cached by default. Use `enableCache(CacheFlag.MESSAGE)` if you need to access messages later
+
+2. **Check Permissions** - Always verify your bot has permission to send messages before responding:
+   ```java
+   if (event.getGuild().getSelfMember().hasPermission(event.getChannel(), Permission.MESSAGE_SEND)) {
+       // Send message
+   }
+   ```
+
+3. **Handle Rate Limits** - Use `.queue()` instead of `.complete()` to avoid blocking and handle rate limits gracefully
+
+4. **Filter Webhooks** - Use `isWebhookMessage()` to filter out webhook messages if needed
+
+5. **DM vs Guild** - Check if `getMember()` is null to determine if a message is from a DM

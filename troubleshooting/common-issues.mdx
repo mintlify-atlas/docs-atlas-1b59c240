@@ -1,0 +1,466 @@
+---
+title: Common Issues
+description: Solutions to frequently encountered problems when using JDA
+---
+
+## Connection Issues
+
+<AccordionGroup>
+  <Accordion title="Bot fails to connect with 'Invalid Token' error">
+    **Symptoms:**
+    ```
+    Exception in thread "main" net.dv8tion.jda.api.exceptions.InvalidTokenException
+    ```
+
+    **Causes:**
+    - Token is incorrect or expired
+    - Token has extra whitespace or characters
+    - Using user token instead of bot token
+
+    **Solutions:**
+    1. Verify your token in the [Discord Developer Portal](https://discord.com/developers/applications)
+    2. Regenerate the token if necessary
+    3. Ensure no extra spaces or quotes in your token string:
+    ```java
+    String token = "YOUR_TOKEN_HERE"; // No spaces!
+    JDABuilder.createDefault(token).build();
+    ```
+    4. Make sure you're using the bot token, not the client secret
+  </Accordion>
+
+  <Accordion title="WebSocket connection failures or frequent disconnects">
+    **Symptoms:**
+    - Bot connects then immediately disconnects
+    - Repeated reconnection attempts
+    - Gateway timeout errors
+
+    **Causes:**
+    - Network connectivity issues
+    - Firewall blocking WebSocket connections
+    - Invalid proxy configuration
+    - Rate limiting from Discord
+
+    **Solutions:**
+    1. Check your internet connection and firewall settings
+    2. Ensure WebSocket connections (wss://) are allowed
+    3. If using a proxy, configure it properly:
+    ```java
+    JDABuilder.createDefault(token)
+        .setProxy(new Proxy(Proxy.Type.HTTP, 
+            new InetSocketAddress("proxy.example.com", 8080)))
+        .build();
+    ```
+    4. Avoid multiple rapid connection attempts (respect rate limits)
+    5. Enable debug logging to see detailed connection info:
+    ```xml
+    <!-- logback.xml -->
+    <logger name="net.dv8tion.jda" level="DEBUG"/>
+    ```
+  </Accordion>
+
+  <Accordion title="Bot goes offline randomly">
+    **Symptoms:**
+    - Bot appears offline in Discord without warning
+    - No error messages in logs
+    - JVM still running
+
+    **Causes:**
+    - Thread pool exhaustion
+    - Unhandled exceptions in event listeners
+    - Memory leaks
+    - Network issues
+
+    **Solutions:**
+    1. Add proper error handling in event listeners:
+    ```java
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        try {
+            // Your code here
+        } catch (Exception e) {
+            logger.error("Error handling message", e);
+        }
+    }
+    ```
+    2. Configure custom thread pool if needed:
+    ```java
+    JDABuilder.createDefault(token)
+        .setCallbackPool(Executors.newFixedThreadPool(10))
+        .build();
+    ```
+    3. Monitor memory usage and optimize caching
+    4. Implement reconnect listeners to log disconnections
+  </Accordion>
+</AccordionGroup>
+
+## Intent and Cache Issues
+
+<AccordionGroup>
+  <Accordion title="Missing message content (empty messages)">
+    **Symptoms:**
+    - `event.getMessage().getContentRaw()` returns empty string
+    - Message content is blank even though message exists
+
+    **Cause:**
+    Missing `MESSAGE_CONTENT` privileged intent
+
+    **Solutions:**
+    1. Enable the intent in [Discord Developer Portal](https://discord.com/developers/applications):
+       - Go to your application
+       - Navigate to "Bot" section
+       - Enable "Message Content Intent"
+    2. Add the intent to your code:
+    ```java
+    JDABuilder.createDefault(token)
+        .enableIntents(GatewayIntent.MESSAGE_CONTENT)
+        .build();
+    ```
+    3. For verified bots with 100+ servers, you may need to apply for intent approval
+  </Accordion>
+
+  <Accordion title="Members not showing up (empty member cache)">
+    **Symptoms:**
+    - `guild.getMembers()` returns empty or incomplete list
+    - `guild.getMemberById()` returns null for existing members
+    - Member count shows as 0 or 1
+
+    **Causes:**
+    - Missing `GUILD_MEMBERS` intent
+    - Member cache disabled
+    - Member chunking not enabled
+
+    **Solutions:**
+    1. Enable required intent and configure caching:
+    ```java
+    JDABuilder.createDefault(token)
+        .enableIntents(GatewayIntent.GUILD_MEMBERS)
+        .setMemberCachePolicy(MemberCachePolicy.ALL)
+        .setChunkingFilter(ChunkingFilter.ALL)
+        .build();
+    ```
+    2. For large bots, use selective caching:
+    ```java
+    JDABuilder.createDefault(token)
+        .enableIntents(GatewayIntent.GUILD_MEMBERS)
+        .setMemberCachePolicy(MemberCachePolicy.VOICE.or(MemberCachePolicy.OWNER))
+        .build();
+    ```
+    3. Fetch members on-demand if caching is disabled:
+    ```java
+    guild.retrieveMemberById(userId).queue(member -> {
+        // Use member here
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Presence updates not received">
+    **Symptoms:**
+    - `onUserUpdateOnlineStatus` not firing
+    - User activities not updating
+
+    **Cause:**
+    Missing `GUILD_PRESENCES` intent
+
+    **Solutions:**
+    1. Enable the privileged intent in Developer Portal
+    2. Add to your bot configuration:
+    ```java
+    JDABuilder.createDefault(token)
+        .enableIntents(GatewayIntent.GUILD_PRESENCES)
+        .build();
+    ```
+    <Warning>
+      `GUILD_PRESENCES` is a privileged intent and requires approval for verified bots
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Command and Interaction Issues
+
+<AccordionGroup>
+  <Accordion title="Slash commands not appearing in Discord">
+    **Symptoms:**
+    - Commands registered but not visible in Discord
+    - `/` menu doesn't show your bot's commands
+
+    **Causes:**
+    - Commands not registered with Discord
+    - Using guild commands but checking different guild
+    - Caching delay for global commands
+
+    **Solutions:**
+    1. Ensure commands are registered:
+    ```java
+    jda.updateCommands()
+        .addCommands(
+            Commands.slash("ping", "Check bot latency")
+        )
+        .queue();
+    ```
+    2. For testing, use guild-specific commands (instant update):
+    ```java
+    guild.updateCommands()
+        .addCommands(Commands.slash("test", "Test command"))
+        .queue();
+    ```
+    3. Global commands can take up to 1 hour to propagate
+    4. Check bot has `applications.commands` scope
+  </Accordion>
+
+  <Accordion title="Interaction timeout: 'Unknown Interaction'">
+    **Symptoms:**
+    ```
+    ErrorResponseException: 10062: Unknown interaction
+    ```
+
+    **Cause:**
+    Response sent more than 3 seconds after receiving interaction
+
+    **Solutions:**
+    1. Always acknowledge interactions immediately:
+    ```java
+    @Override
+    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        event.deferReply().queue(); // Acknowledge immediately
+        
+        // Do long-running task
+        performLongTask().thenAccept(result -> {
+            event.getHook().sendMessage(result).queue();
+        });
+    }
+    ```
+    2. Use `deferReply(true)` for ephemeral responses
+    3. For very long operations, send immediate response and update later
+  </Accordion>
+
+  <Accordion title="Button or menu interactions not working">
+    **Symptoms:**
+    - Clicking buttons/menus does nothing
+    - "This interaction failed" message
+
+    **Causes:**
+    - Component IDs don't match handler
+    - No event listener registered
+    - Component expired (messages older than 15 minutes)
+
+    **Solutions:**
+    1. Ensure listener is registered:
+    ```java
+    jda.addEventListener(new ButtonListener());
+    ```
+    2. Match component IDs correctly:
+    ```java
+    // Creating button
+    Button button = Button.primary("accept", "Accept");
+    
+    // Handling button
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        if (event.getComponentId().equals("accept")) {
+            event.reply("Accepted!").queue();
+        }
+    }
+    ```
+    3. For persistent buttons, use unique IDs and store state in database
+  </Accordion>
+</AccordionGroup>
+
+## Audio Issues
+
+<AccordionGroup>
+  <Accordion title="Bot joins voice but no audio plays">
+    **Symptoms:**
+    - Bot appears in voice channel
+    - No sound is heard
+    - No errors in console
+
+    **Causes:**
+    - Missing audio implementation (DAVE Protocol)
+    - Audio send system not configured
+    - Bot muted or volume at 0
+
+    **Solutions:**
+    1. Add DAVE Protocol implementation dependency:
+    ```gradle
+    dependencies {
+        implementation("net.dv8tion:JDA:6.3.1")
+        implementation("dev.arbjerg:lavaplayer:2.2.2")
+    }
+    ```
+    2. Check if bot is server muted in Discord
+    3. Verify audio sending is working:
+    ```java
+    AudioManager audioManager = guild.getAudioManager();
+    audioManager.setSendingHandler(yourAudioSendHandler);
+    ```
+    4. See [Making a Music Bot](https://jda.wiki/using-jda/making-a-music-bot/) guide
+  </Accordion>
+
+  <Accordion title="Audio stuttering or choppy playback">
+    **Symptoms:**
+    - Audio plays but skips or stutters
+    - Robotic or distorted sound
+
+    **Causes:**
+    - GC pauses interrupting audio thread
+    - CPU overload
+    - Network issues
+
+    **Solutions:**
+    1. Use `udpqueue` to avoid GC pauses:
+    ```java
+    JDABuilder.createDefault(token)
+        .setAudioSendFactory(new NativeAudioSendFactory())
+        .build();
+    ```
+    2. Optimize JVM garbage collection settings
+    3. Reduce bot workload during playback
+    4. Use Lavalink for distributed audio processing
+  </Accordion>
+
+  <Accordion title="Cannot join voice channel">
+    **Symptoms:**
+    ```
+    InsufficientPermissionException: VOICE_CONNECT
+    ```
+
+    **Cause:**
+    Bot lacks required permissions
+
+    **Solutions:**
+    1. Check bot has `VOICE_CONNECT` permission:
+    ```java
+    if (voiceChannel.getGuild().getSelfMember()
+            .hasPermission(voiceChannel, Permission.VOICE_CONNECT)) {
+        audioManager.openAudioConnection(voiceChannel);
+    }
+    ```
+    2. Verify role permissions in Discord server settings
+    3. Check channel-specific permission overrides
+  </Accordion>
+</AccordionGroup>
+
+## Performance Issues
+
+<AccordionGroup>
+  <Accordion title="High memory usage">
+    **Causes:**
+    - Aggressive caching
+    - Memory leaks in event handlers
+    - Large message/embed caching
+
+    **Solutions:**
+    1. Use lighter cache configuration:
+    ```java
+    JDABuilder.createLight(token)
+        .setEnabledCacheFlags(EnumSet.noneOf(CacheFlag.class))
+        .build();
+    ```
+    2. Disable unnecessary caches:
+    ```java
+    JDABuilder.createDefault(token)
+        .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+        .build();
+    ```
+    3. Monitor heap usage and tune JVM parameters
+    4. Use weak references for temporary data
+  </Accordion>
+
+  <Accordion title="Slow response times or rate limit errors">
+    **Symptoms:**
+    - Commands take long to respond
+    - `RateLimitedException` errors
+    - 429 HTTP responses
+
+    **Causes:**
+    - Hitting Discord API rate limits
+    - Too many requests in short time
+    - Inefficient request patterns
+
+    **Solutions:**
+    1. JDA handles rate limits automatically - don't override
+    2. Batch requests when possible:
+    ```java
+    RestAction.allOf(actions).queue();
+    ```
+    3. Use efficient caching to reduce API calls
+    4. Implement request queuing for burst operations
+    5. Review logs for rate limit warnings
+  </Accordion>
+</AccordionGroup>
+
+## Build and Dependency Issues
+
+<AccordionGroup>
+  <Accordion title="NoClassDefFoundError or ClassNotFoundException">
+    **Symptoms:**
+    ```
+    java.lang.NoClassDefFoundError: org/slf4j/Logger
+    ```
+
+    **Cause:**
+    Missing dependencies
+
+    **Solutions:**
+    1. Add SLF4J implementation:
+    ```gradle
+    dependencies {
+        implementation("net.dv8tion:JDA:6.3.1")
+        implementation("ch.qos.logback:logback-classic:1.4.11")
+    }
+    ```
+    2. If using Maven, ensure all dependencies are included
+    3. For shaded JARs, verify dependency inclusion
+  </Accordion>
+
+  <Accordion title="Dependency conflicts or version mismatches">
+    **Symptoms:**
+    - Build fails with dependency resolution errors
+    - Runtime errors with conflicting classes
+
+    **Solutions:**
+    1. Use dependency management:
+    ```gradle
+    configurations.all {
+        resolutionStrategy {
+            force("com.squareup.okhttp3:okhttp:4.12.0")
+        }
+    }
+    ```
+    2. Check for conflicting transitive dependencies
+    3. Update all JDA-related libraries together
+  </Accordion>
+
+  <Accordion title="Build fails with Java version errors">
+    **Cause:**
+    JDA requires Java 8 or higher
+
+    **Solutions:**
+    1. Ensure Java 8+ is installed: `java -version`
+    2. Set Gradle/Maven to use Java 8+:
+    ```gradle
+    java {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(17))
+        }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Getting More Help
+
+If your issue isn't listed here:
+
+1. **Search existing issues**: [GitHub Issues](https://github.com/discord-jda/JDA/issues)
+2. **Check the FAQ**: [JDA FAQ](/troubleshooting/faq)
+3. **Ask on Discord**: [JDA Discord Server](https://discord.gg/0hMr4ce0tIl3SLv5)
+4. **Review documentation**: [JDA Wiki](https://jda.wiki)
+
+<Tip>
+  When reporting issues, always include:
+  - JDA version
+  - Java version
+  - Complete error stack trace
+  - Minimal reproducible code example
+</Tip>

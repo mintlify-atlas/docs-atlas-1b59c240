@@ -1,0 +1,274 @@
+---
+title: Creating a Discord Bot
+description: Learn how to create and configure your first Discord bot application with JDA
+---
+
+This guide walks you through creating a Discord bot application and getting started with JDA.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- Java SE 8 or higher installed
+- A Discord account
+- Basic knowledge of Java programming
+
+## Creating Your Bot Application
+
+<Steps>
+  <Step title="Access the Discord Developer Portal">
+    Navigate to the [Discord Application Dashboard](https://discord.com/developers/applications) and log in with your Discord account.
+  </Step>
+
+  <Step title="Create a New Application">
+    Click the **New Application** button in the top right corner. Enter a name for your application and click **Create**.
+  </Step>
+
+  <Step title="Navigate to the Bot Section">
+    In the left sidebar, click on **Bot**. Then click **Add Bot** to create a bot user for your application.
+  </Step>
+
+  <Step title="Get Your Bot Token">
+    Click **Reset Token** to generate a new bot token. **Copy this token immediately** and store it securely - you won't be able to see it again.
+
+    <Warning>
+      Never share your bot token publicly or commit it to version control. Anyone with your token can control your bot.
+    </Warning>
+  </Step>
+
+  <Step title="Configure Privileged Gateway Intents">
+    Scroll down to the **Privileged Gateway Intents** section. Enable any intents your bot needs:
+    
+    - **Presence Intent** - For member status/activities
+    - **Server Members Intent** - For member join/leave events
+    - **Message Content Intent** - For reading message content
+
+    <Note>
+      You must explicitly enable privileged intents both in the Developer Portal AND in your code.
+    </Note>
+  </Step>
+
+  <Step title="Invite Your Bot to a Server">
+    Go to the **OAuth2** > **URL Generator** section. Select the following:
+    
+    - **Scopes**: `bot` and `applications.commands`
+    - **Bot Permissions**: Select the permissions your bot needs
+
+    Copy the generated URL and paste it into your browser to invite the bot to your server.
+  </Step>
+</Steps>
+
+## Setting Up Your Project
+
+### Adding JDA to Your Project
+
+<CodeGroup>
+```gradle Gradle
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("net.dv8tion:JDA:5.2.1")
+}
+```
+
+```xml Maven
+<dependency>
+    <groupId>net.dv8tion</groupId>
+    <artifactId>JDA</artifactId>
+    <version>5.2.1</version>
+</dependency>
+```
+</CodeGroup>
+
+## Storing Your Bot Token
+
+Never hardcode your token directly in your source code. Here are recommended approaches:
+
+### Option 1: Environment Variable (Recommended)
+
+```java
+String token = System.getenv("BOT_TOKEN");
+```
+
+Set the environment variable before running:
+```bash
+export BOT_TOKEN="your-bot-token-here"
+java -jar your-bot.jar
+```
+
+### Option 2: Configuration File
+
+Store the token in a file that's added to `.gitignore`:
+
+```java
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
+
+String token = new String(
+    Files.readAllBytes(Paths.get("token.txt")),
+    StandardCharsets.UTF_8
+).trim();
+```
+
+### Option 3: System Property
+
+```java
+String token = System.getProperty("token");
+```
+
+Pass it when running:
+```bash
+java -Dtoken="your-bot-token-here" -jar your-bot.jar
+```
+
+<Warning>
+This method leaks the token in process lists visible to other users on the system.
+</Warning>
+
+## Choosing a Builder Preset
+
+JDA provides three factory methods for creating your bot, each with different cache configurations:
+
+### createLight()
+
+Minimal cache profile for low memory usage:
+
+```java
+JDA jda = JDABuilder.createLight(token, intents)
+    .addEventListeners(new MyListener())
+    .build();
+```
+
+- Disables all user cache and cache flags
+- Lowest memory footprint
+- Best for bots that don't need member information
+
+### createDefault()
+
+Recommended default settings:
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .addEventListeners(new MyListener())
+    .build();
+```
+
+- Caches users who are active in voice channels
+- Enables most cache flags
+- Good balance between features and memory
+
+### create()
+
+Full cache profile:
+
+```java
+JDA jda = JDABuilder.create(token, intents)
+    .addEventListeners(new MyListener())
+    .build();
+```
+
+- Enables member chunking
+- Caches all users
+- Highest memory usage but full functionality
+
+## Understanding Gateway Intents
+
+Intents control which events your bot receives. This improves performance by only processing events you need.
+
+```java
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+EnumSet<GatewayIntent> intents = EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,      // Receive messages in guilds
+    GatewayIntent.DIRECT_MESSAGES,     // Receive direct messages
+    GatewayIntent.MESSAGE_CONTENT,     // Access message.getContentRaw()
+    GatewayIntent.GUILD_MESSAGE_REACTIONS  // Receive reaction events
+);
+
+JDA jda = JDABuilder.createLight(token, intents)
+    .build();
+```
+
+<Tip>
+Only enable the intents you actually need. This reduces bandwidth and improves performance.
+</Tip>
+
+## Your First Bot
+
+Here's a complete example that logs in and waits until ready:
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+import java.util.EnumSet;
+
+public class MyBot {
+    public static void main(String[] args) throws InterruptedException {
+        String token = System.getenv("BOT_TOKEN");
+        
+        EnumSet<GatewayIntent> intents = EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.MESSAGE_CONTENT
+        );
+        
+        JDA jda = JDABuilder.createLight(token, intents)
+            .setActivity(Activity.playing("with JDA"))
+            .build();
+        
+        // Check the REST API ping
+        jda.getRestPing().queue(ping ->
+            System.out.println("Logged in with ping: " + ping + "ms")
+        );
+        
+        // Wait for JDA to be ready (cache loaded)
+        jda.awaitReady();
+        
+        System.out.println("Bot is ready!");
+        System.out.println("Guilds: " + jda.getGuildCache().size());
+    }
+}
+```
+
+## Next Steps
+
+Now that you have a bot running, you can:
+
+- [Build a message logging bot](/guides/message-logging)
+- [Implement slash commands](/guides/slash-commands)
+- [Handle interactions](/guides/interactions)
+- Learn about [error handling patterns](/guides/error-handling)
+
+## Common Issues
+
+### "Invalid Token" Error
+
+Make sure:
+- You copied the entire token without extra spaces
+- The token is from the Bot section, not the application ID
+- You haven't regenerated the token since copying it
+
+### Missing Events
+
+If events aren't firing:
+- Verify the required intent is enabled in both code AND the Developer Portal
+- Check that your event listener is properly registered
+- Ensure the event you're listening for matches the enabled intents
+
+### Bot Not Responding
+
+Remember to call `.queue()` on all RestActions:
+
+```java
+// Wrong - does nothing
+channel.sendMessage("Hello");
+
+// Correct - sends the message
+channel.sendMessage("Hello").queue();
+```

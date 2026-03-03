@@ -1,0 +1,283 @@
+---
+title: Command Localization
+description: Localize slash commands for different languages and regions
+---
+
+Localization allows your bot's commands to appear in different languages based on each user's Discord language settings. This example demonstrates both automatic localization using resource bundles and manual localization.
+
+## Overview
+
+JDA supports two approaches to localization:
+- **Automatic**: Using `ResourceBundleLocalizationFunction` with `.properties` files
+- **Manual**: Setting localizations directly on command objects
+
+Both approaches allow you to translate:
+- Command names
+- Command descriptions
+- Option names and descriptions
+- Choice names
+
+## Automatic Localization with Resource Bundles
+
+<Steps>
+  <Step title="Create Resource Bundle Files">
+    Create `.properties` files in your `resources` folder:
+
+    **MyCommands_es_ES.properties** (Spanish):
+    ```properties
+    ban.name=banear
+    ban.description=Banea a alguien
+    ban.member.name=miembro
+    ban.member.description=Banea a un miembro
+    ban.member.perm.name=permanente
+    ban.member.perm.description=Banea a un miembro permanentemente
+    ban.member.temp.name=temporal
+    ban.member.temp.description=Banea a un miembro temporalmente
+    ban.member.perm.user.name=usuario
+    ban.member.perm.user.description=El usuario a banear
+    ```
+
+    **MyCommands_fr.properties** (French):
+    ```properties
+    ban.name=bannir
+    ban.description=Bannir quelqu'un
+    ban.member.name=membre
+    ban.member.description=Bannir un membre
+    ban.member.perm.name=permanent
+    ban.member.perm.description=Bannir un membre de façon permanente
+    ban.member.temp.name=temporaire
+    ban.member.temp.description=Bannir un membre temporairement
+    ban.member.perm.user.name=utilisateur
+    ban.member.perm.user.description=L'utilisateur à bannir
+    ```
+  </Step>
+
+  <Step title="Create Localization Function">
+    Build a `LocalizationFunction` from your resource bundles:
+
+    ```java
+    LocalizationFunction localizationFunction = 
+        ResourceBundleLocalizationFunction.fromBundles(
+            "MyCommands",  // Base name of your .properties files
+            DiscordLocale.SPANISH,
+            DiscordLocale.FRENCH
+        ).build();
+    ```
+  </Step>
+
+  <Step title="Apply to Commands">
+    Set the localization function on your slash command:
+
+    ```java
+    SlashCommandData slashCommandData = Commands.slash("ban", "Bans someone")
+        .setLocalizationFunction(localizationFunction)
+        .addSubcommandGroups(new SubcommandGroupData("member", "Bans a member")
+            .addSubcommands(
+                banSubcommand("perm", "Bans a member permanently"),
+                banSubcommand("temp", "Bans a member temporarily")
+            ));
+    ```
+  </Step>
+</Steps>
+
+## How Resource Bundle Localization Works
+
+The localization function automatically maps command structure to property keys:
+
+```
+Command path: /ban member perm
+Property keys:
+  - ban.name
+  - ban.description
+  - ban.member.name
+  - ban.member.description
+  - ban.member.perm.name
+  - ban.member.perm.description
+  - ban.member.perm.user.name (option)
+  - ban.member.perm.user.description (option)
+```
+
+<Note>
+  The property key structure follows the command hierarchy: `command.subcommandGroup.subcommand.option.field`
+</Note>
+
+## Manual Localization
+
+For simpler commands or more control, use manual localization:
+
+```java
+// Context menu command for messages
+CommandData messageCommand = Commands.message("Show raw content")
+    .setNameLocalization(DiscordLocale.SPANISH, "Mostrar el contenido en bruto")
+    .setNameLocalization(DiscordLocale.FRENCH, "Afficher contenu brut");
+
+// Context menu command for users
+CommandData userCommand = Commands.user("Show avatar")
+    .setNameLocalization(DiscordLocale.SPANISH, "Mostrar avatar")
+    .setNameLocalization(DiscordLocale.FRENCH, "Afficher avatar");
+```
+
+### Manual Description Localization
+
+```java
+Commands.slash("hello", "Say hello")
+    .setDescriptionLocalization(DiscordLocale.SPANISH, "Decir hola")
+    .setDescriptionLocalization(DiscordLocale.FRENCH, "Dire bonjour")
+```
+
+## Localizing Options and Choices
+
+Options and choices are localized the same way:
+
+```java
+private static SubcommandData banSubcommand(String name, String description) {
+    return new SubcommandData(name, description)
+        .addOptions(
+            new OptionData(OptionType.STRING, "user", "The user to ban"),
+            new OptionData(OptionType.INTEGER, "del_days", "The amount of days to delete messages")
+                .addChoices(
+                    new Command.Choice("1 Day", "1"),
+                    new Command.Choice("7 Days", "7"),
+                    new Command.Choice("14 Days", "14")
+                )
+        );
+}
+```
+
+With resource bundles, add:
+
+```properties
+# Spanish
+ban.member.perm.del_days.name=días_borrados
+ban.member.perm.del_days.description=La cantidad de días para eliminar mensajes
+ban.member.perm.del_days.choices.1_Day=1 Día
+ban.member.perm.del_days.choices.7_Days=7 Días
+ban.member.perm.del_days.choices.14_Days=14 Días
+```
+
+## Supported Discord Locales
+
+JDA supports all Discord locales through the `DiscordLocale` enum:
+
+- `ENGLISH_US` - English (United States)
+- `ENGLISH_UK` - English (United Kingdom)
+- `SPANISH` - Spanish
+- `FRENCH` - French
+- `GERMAN` - German
+- `ITALIAN` - Italian
+- `JAPANESE` - Japanese
+- `KOREAN` - Korean
+- `CHINESE_CHINA` - Chinese (China)
+- `CHINESE_TAIWAN` - Chinese (Taiwan)
+- `PORTUGUESE_BRAZILIAN` - Portuguese (Brazil)
+- `RUSSIAN` - Russian
+- `TURKISH` - Turkish
+- And more...
+
+## Custom Localization Function
+
+You can implement your own `LocalizationFunction` for custom behavior:
+
+```java
+public class CustomLocalizationFunction implements LocalizationFunction {
+    @Override
+    public Map<DiscordLocale, String> apply(String localizationKey) {
+        // Load translations from database, API, or custom format
+        Map<DiscordLocale, String> translations = new HashMap<>();
+        
+        // Example: wildcard support
+        if (localizationKey.contains("user")) {
+            translations.put(DiscordLocale.SPANISH, "usuario");
+            translations.put(DiscordLocale.FRENCH, "utilisateur");
+        }
+        
+        return translations;
+    }
+}
+```
+
+Benefits of custom implementations:
+- Load translations from databases or APIs
+- Support wildcards to reduce duplication
+- Use alternative file formats (JSON, YAML, etc.)
+- Dynamic language loading without recompilation
+
+## Complete Example
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.interactions.DiscordLocale;
+import net.dv8tion.jda.api.interactions.commands.Command;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.build.*;
+import net.dv8tion.jda.api.interactions.commands.localization.LocalizationFunction;
+import net.dv8tion.jda.api.interactions.commands.localization.ResourceBundleLocalizationFunction;
+
+import javax.security.auth.login.LoginException;
+
+public class LocalizationExample {
+    public static void main(String[] args) throws LoginException {
+        String token = "BOT_TOKEN_HERE";
+        JDA jda = JDABuilder.createLight(token).build();
+
+        // Automatic localization with resource bundles
+        LocalizationFunction localizationFunction = 
+            ResourceBundleLocalizationFunction.fromBundles(
+                "MyCommands", 
+                DiscordLocale.SPANISH, 
+                DiscordLocale.FRENCH
+            ).build();
+
+        // Slash command with automatic localization
+        SlashCommandData slashCommandData = Commands.slash("ban", "Bans someone")
+            .setLocalizationFunction(localizationFunction)
+            .addSubcommandGroups(new SubcommandGroupData("member", "Bans a member")
+                .addSubcommands(
+                    banSubcommand("perm", "Bans a member permanently"),
+                    banSubcommand("temp", "Bans a member temporarily")
+                ));
+
+        // Manual localization for context menu commands
+        CommandData messageCommand = Commands.message("Show raw content")
+            .setNameLocalization(DiscordLocale.SPANISH, "Mostrar el contenido en bruto")
+            .setNameLocalization(DiscordLocale.FRENCH, "Afficher contenu brut");
+
+        CommandData userCommand = Commands.user("Show avatar")
+            .setNameLocalization(DiscordLocale.SPANISH, "Mostrar avatar")
+            .setNameLocalization(DiscordLocale.FRENCH, "Afficher avatar");
+
+        // Register all commands
+        jda.updateCommands()
+            .addCommands(slashCommandData, messageCommand, userCommand)
+            .queue();
+    }
+
+    private static SubcommandData banSubcommand(String name, String description) {
+        return new SubcommandData(name, description)
+            .addOptions(
+                new OptionData(OptionType.STRING, "user", "The user to ban"),
+                new OptionData(OptionType.INTEGER, "del_days", "The amount of days to delete messages")
+                    .addChoices(
+                        new Command.Choice("1 Day", "1"),
+                        new Command.Choice("7 Days", "7"),
+                        new Command.Choice("14 Days", "14")
+                    )
+            );
+    }
+}
+```
+
+## Best Practices
+
+<Tip>
+  - Always provide English as the base language
+  - Keep property file keys consistent with command structure
+  - Test localizations with Discord's language settings
+  - Consider using manual localization for simple commands
+  - Use resource bundles for complex command hierarchies
+</Tip>
+
+<Warning>
+  Command names in some languages must follow Discord's naming rules (lowercase, no spaces, etc.). Some translations may need adjustment.
+</Warning>

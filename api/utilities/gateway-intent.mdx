@@ -1,0 +1,532 @@
+---
+title: GatewayIntent
+description: Flags that enable or disable specific Discord gateway events for controlling which events your bot receives
+---
+
+# GatewayIntent
+
+Flags which enable or disable specific events from the Discord gateway. Gateway intents allow you to control which events your bot receives, reducing bandwidth and improving performance.
+
+## Overview
+
+Gateway intents are used to subscribe to specific categories of events. Some intents are **privileged** and require approval from Discord or enabling in your application's developer dashboard.
+
+### Privileged Intents
+
+The following intents are privileged and require special approval:
+- `GUILD_MEMBERS` - Member join/leave/update events
+- `GUILD_PRESENCES` - Presence and online status updates
+- `MESSAGE_CONTENT` - Access to message content data
+
+## Intent Constants
+
+### GUILD_MEMBERS
+
+**PRIVILEGED INTENT** - Events for member updates, joins, and leaves.
+
+Required to chunk all members of a guild. Without this enabled, you must use `ChunkingFilter.NONE`. Also updates user information such as username and avatar.
+
+**Offset**: 1
+
+```java
+JDABuilder.createDefault(token)
+    .enableIntents(GatewayIntent.GUILD_MEMBERS)
+    .build();
+```
+
+### GUILD_MODERATION
+
+Moderation events such as bans, unbans, and audit logs.
+
+**Offset**: 2
+
+**Events:**
+- Guild ban/unban events
+- Audit log entry creation
+
+### GUILD_EXPRESSIONS
+
+Custom emoji, sticker, and soundboard sound add/update/delete events.
+
+**Offset**: 3
+
+**Events:**
+- Emoji created/updated/deleted
+- Sticker created/updated/deleted
+- Soundboard sounds modified
+
+### GUILD_WEBHOOKS
+
+Webhook events for creation, update, and deletion.
+
+**Offset**: 5
+
+**Events:**
+- Webhook created/updated/deleted
+
+### GUILD_INVITES
+
+Invite events for creation and deletion.
+
+**Offset**: 6
+
+**Events:**
+- Invite created
+- Invite deleted
+
+### GUILD_VOICE_STATES
+
+Voice state events. Required to get information about members in voice channels and to connect to voice channels.
+
+**Offset**: 7
+
+**Important**: You cannot connect to a voice channel without this intent.
+
+**Events:**
+- Voice state updates
+- Members joining/leaving voice channels
+
+### GUILD_PRESENCES
+
+**PRIVILEGED INTENT** - Presence updates including online status and activities.
+
+**Offset**: 8
+
+This is a very heavy intent as presence updates constitute ~99% of gateway traffic. Used primarily to track `Member.getOnlineStatus()` and `Member.getActivities()`.
+
+Consider using `GUILD_MEMBERS` instead if you only need user updates.
+
+### GUILD_MESSAGES
+
+Message events from text channels in guilds. Most bots need this for commands.
+
+**Offset**: 9
+
+**Events:**
+- Message created/updated/deleted in guild channels
+- Bulk message deletion
+
+### GUILD_MESSAGE_REACTIONS
+
+Message reaction events in guilds. Useful for reaction roles and paginated embeds.
+
+**Offset**: 10
+
+**Events:**
+- Reactions added/removed in guild channels
+
+### GUILD_MESSAGE_TYPING
+
+Typing start events in guilds. Rarely used by bots.
+
+**Offset**: 11
+
+**Events:**
+- User starts typing in guild channels
+
+### DIRECT_MESSAGES
+
+Message events in private channels (DMs). You can still send DMs without this intent.
+
+**Offset**: 12
+
+**Events:**
+- DM messages created/updated/deleted
+
+### DIRECT_MESSAGE_REACTIONS
+
+Message reaction events in private channels.
+
+**Offset**: 13
+
+**Events:**
+- Reactions added/removed in DMs
+
+### DIRECT_MESSAGE_TYPING
+
+Typing start events in private channels. Rarely used by bots.
+
+**Offset**: 14
+
+**Events:**
+- User starts typing in DMs
+
+### MESSAGE_CONTENT
+
+**PRIVILEGED INTENT** - Access to message content.
+
+Affects messages received through message history or message events. Does not apply to:
+- Messages that mention the bot directly
+- Messages sent by the bot itself
+- Direct messages in private channels
+
+**Offset**: 15
+
+**Restricted Content:**
+- `Message.getContentRaw()`, `getContentDisplay()`, `getContentStripped()`
+- `Message.getEmbeds()`
+- `Message.getAttachments()`
+- `Message.getComponents()`, `getComponentTree()`
+
+### SCHEDULED_EVENTS
+
+Scheduled event tracking in guilds.
+
+**Offset**: 16
+
+**Events:**
+- Scheduled events created/updated/deleted
+- User subscriptions to scheduled events
+
+### AUTO_MODERATION_CONFIGURATION
+
+Auto-moderation rule changes.
+
+**Offset**: 20
+
+**Events:**
+- Auto-mod rules created/updated/deleted
+
+### AUTO_MODERATION_EXECUTION
+
+Auto-moderation response action events.
+
+**Offset**: 21
+
+**Events:**
+- Auto-mod actions executed
+
+### GUILD_MESSAGE_POLLS
+
+Poll vote events in guilds.
+
+**Offset**: 24
+
+**Events:**
+- Poll votes in guild channels
+
+### DIRECT_MESSAGE_POLLS
+
+Poll vote events in private channels.
+
+**Offset**: 25
+
+**Events:**
+- Poll votes in DMs
+
+## Methods
+
+### getRawValue()
+
+Returns the raw bitmask value for this intent.
+
+**Returns:** The raw bitmask value
+
+```java
+int raw = GatewayIntent.GUILD_MESSAGES.getRawValue();
+```
+
+### getOffset()
+
+Returns the offset of the intent flag within a bitmask.
+
+**Returns:** The bit offset (where `getRawValue() == 1 << getOffset()`)
+
+```java
+int offset = GatewayIntent.GUILD_MEMBERS.getOffset(); // 1
+```
+
+## Static Methods
+
+### getIntents(int raw)
+
+Converts a bitmask into an EnumSet of intents.
+
+**Parameters:**
+- `raw` - The raw bitmask
+
+**Returns:** EnumSet of GatewayIntent
+
+```java
+int bitmask = 513; // GUILD_MESSAGES + others
+EnumSet<GatewayIntent> intents = GatewayIntent.getIntents(bitmask);
+```
+
+### getRaw(Collection\<GatewayIntent\> set)
+
+Converts a collection of intents to a bitmask.
+
+**Parameters:**
+- `set` - The collection of intents
+
+**Returns:** The bitmask representation
+
+```java
+EnumSet<GatewayIntent> intents = EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.DIRECT_MESSAGES
+);
+int bitmask = GatewayIntent.getRaw(intents);
+```
+
+### getRaw(GatewayIntent intent, GatewayIntent... set)
+
+Converts intents to a bitmask.
+
+**Parameters:**
+- `intent` - The first intent
+- `set` - Additional intents
+
+**Returns:** The bitmask representation
+
+```java
+int bitmask = GatewayIntent.getRaw(
+    GatewayIntent.GUILD_MESSAGES,
+    GatewayIntent.GUILD_MESSAGE_REACTIONS
+);
+```
+
+### fromCacheFlags(CacheFlag flag, CacheFlag... other)
+
+Parses required intents from cache flags.
+
+**Parameters:**
+- `flag` - The first cache flag
+- `other` - Additional cache flags
+
+**Returns:** EnumSet of required intents
+
+```java
+EnumSet<GatewayIntent> intents = GatewayIntent.fromCacheFlags(
+    CacheFlag.MEMBER_OVERRIDES,
+    CacheFlag.VOICE_STATE
+);
+```
+
+### fromCacheFlags(Collection\<CacheFlag\> flags)
+
+Parses required intents from a collection of cache flags.
+
+**Parameters:**
+- `flags` - The cache flags
+
+**Returns:** EnumSet of required intents
+
+```java
+Collection<CacheFlag> flags = Arrays.asList(
+    CacheFlag.ACTIVITY,
+    CacheFlag.ONLINE_STATUS
+);
+EnumSet<GatewayIntent> intents = GatewayIntent.fromCacheFlags(flags);
+```
+
+### fromEvents(Class\<? extends GenericEvent\>... events)
+
+Parses required intents from event types.
+
+**Parameters:**
+- `events` - The event classes
+
+**Returns:** EnumSet of required intents
+
+```java
+EnumSet<GatewayIntent> intents = GatewayIntent.fromEvents(
+    MessageReceivedEvent.class,
+    GuildMemberJoinEvent.class
+);
+```
+
+### fromEvents(Collection\<Class\<? extends GenericEvent\>\> events)
+
+Parses required intents from a collection of event types.
+
+**Parameters:**
+- `events` - The event classes
+
+**Returns:** EnumSet of required intents
+
+```java
+List<Class<? extends GenericEvent>> events = Arrays.asList(
+    MessageReceivedEvent.class,
+    ReactionAddEvent.class
+);
+EnumSet<GatewayIntent> intents = GatewayIntent.fromEvents(events);
+```
+
+### from(Collection\<Class\<? extends GenericEvent\>\> events, Collection\<CacheFlag\> flags)
+
+Parses required intents from both event types and cache flags.
+
+**Parameters:**
+- `events` - The event classes
+- `flags` - The cache flags
+
+**Returns:** EnumSet of required intents
+
+```java
+EnumSet<GatewayIntent> intents = GatewayIntent.from(eventTypes, cacheFlags);
+```
+
+## Constants
+
+### ALL_INTENTS
+
+Bitmask with all intents enabled.
+
+```java
+int all = GatewayIntent.ALL_INTENTS;
+```
+
+Note: To use all intents in code, prefer `EnumSet.allOf(GatewayIntent.class)`.
+
+### DEFAULT
+
+Recommended default intents with privileged and rarely-used intents disabled:
+
+**Excluded:**
+- `GUILD_MEMBERS` (privileged)
+- `GUILD_PRESENCES` (privileged)
+- `MESSAGE_CONTENT` (privileged)
+- `GUILD_WEBHOOKS` (not useful for most bots)
+- `GUILD_MESSAGE_TYPING` (not useful for most bots)
+- `DIRECT_MESSAGE_TYPING` (not useful for most bots)
+
+```java
+JDABuilder.createDefault(token); // Uses DEFAULT intents
+```
+
+## Usage Examples
+
+### Basic Bot with Default Intents
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+public class MyBot {
+    public static void main(String[] args) {
+        // Uses GatewayIntent.DEFAULT
+        JDABuilder.createDefault(token)
+            .build();
+    }
+}
+```
+
+### Enabling Privileged Intents
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+public class PrivilegedBot {
+    public static void main(String[] args) {
+        JDABuilder.createDefault(token)
+            .enableIntents(
+                GatewayIntent.GUILD_MEMBERS,
+                GatewayIntent.MESSAGE_CONTENT
+            )
+            .build();
+    }
+}
+```
+
+### Minimal Bot (Light Mode)
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.ChunkingFilter;
+
+public class MinimalBot {
+    public static void main(String[] args) {
+        // Only essential intents
+        JDABuilder.createLight(token)
+            .enableIntents(
+                GatewayIntent.GUILD_MESSAGES,
+                GatewayIntent.DIRECT_MESSAGES
+            )
+            .setChunkingFilter(ChunkingFilter.NONE) // Required without GUILD_MEMBERS
+            .build();
+    }
+}
+```
+
+### Custom Intent Configuration
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+public class CustomBot {
+    public static void main(String[] args) {
+        EnumSet<GatewayIntent> intents = EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.GUILD_MESSAGE_REACTIONS,
+            GatewayIntent.GUILD_VOICE_STATES,
+            GatewayIntent.DIRECT_MESSAGES
+        );
+        
+        JDABuilder.create(token, intents)
+            .build();
+    }
+}
+```
+
+### Voice-Enabled Bot
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+public class MusicBot {
+    public static void main(String[] args) {
+        JDABuilder.createDefault(token)
+            .enableIntents(GatewayIntent.GUILD_VOICE_STATES) // Required for voice
+            .build();
+    }
+}
+```
+
+### Auto-detecting Intents from Events
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+public class SmartBot {
+    public static void main(String[] args) {
+        // Automatically determine required intents
+        EnumSet<GatewayIntent> intents = GatewayIntent.fromEvents(
+            MessageReceivedEvent.class,
+            GuildMemberJoinEvent.class
+        );
+        
+        JDABuilder.create(token, intents)
+            .build();
+    }
+}
+```
+
+## Important Notes
+
+1. **Chunking Requirement**: You must use `ChunkingFilter.NONE` if `GUILD_MEMBERS` is disabled.
+
+2. **Privileged Intents**: To use privileged intents, you must:
+   - Enable them in your Discord application dashboard
+   - If your bot is in 100+ servers, request verification from Discord
+
+3. **Performance**: Disable unused intents to reduce bandwidth and improve performance, especially `GUILD_PRESENCES` which generates significant traffic.
+
+4. **Voice Connections**: `GUILD_VOICE_STATES` is mandatory for voice functionality.
+
+## See Also
+
+- [JDABuilder](../jda-builder)
+- [ChunkingFilter](./chunking-filter)
+- [CacheFlag](./cache-flag)
+- [Discord Gateway Intents Documentation](https://discord.com/developers/docs/topics/gateway#gateway-intents)

@@ -1,0 +1,478 @@
+---
+title: Message
+description: API reference for the Message entity in JDA
+---
+
+Represents a text message received from Discord. This represents messages received from MessageChannels.
+
+## Overview
+
+The Message interface provides access to all message data including content, attachments, embeds, and reactions. Messages are immutable - JDA does not track changes to messages.
+
+## Key Properties
+
+### Message Content
+
+<ResponseField name="getContentRaw()" type="String">
+  The raw textual content of this message. Does not resolve mentions.
+  
+  Requires `MESSAGE_CONTENT` intent.
+  
+  ```java
+  String content = message.getContentRaw();
+  ```
+</ResponseField>
+
+<ResponseField name="getContentDisplay()" type="String">
+  The textual content with mentions resolved to be visually like the Discord client.
+  
+  Requires `MESSAGE_CONTENT` intent.
+  
+  ```java
+  String displayContent = message.getContentDisplay();
+  ```
+</ResponseField>
+
+<ResponseField name="getContentStripped()" type="String">
+  Gets the textual content and strips markdown formatting characters.
+  
+  Requires `MESSAGE_CONTENT` intent.
+  
+  ```java
+  String strippedContent = message.getContentStripped();
+  ```
+</ResponseField>
+
+### Author Information
+
+<ResponseField name="getAuthor()" type="User">
+  The author of this Message.
+  
+  ```java
+  User author = message.getAuthor();
+  System.out.println("From: " + author.getAsTag());
+  ```
+</ResponseField>
+
+<ResponseField name="getMember()" type="Member">
+  Returns the author of this Message as a Member.
+  
+  Returns `null` if the message was not sent in a guild, or if sent by a webhook.
+  
+  ```java
+  Member member = message.getMember();
+  if (member != null) {
+      System.out.println("Roles: " + member.getRoles());
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isWebhookMessage()" type="boolean">
+  Indicates if this Message was sent by a Webhook or an app, instead of a User.
+  
+  ```java
+  if (message.isWebhookMessage()) {
+      return; // Ignore webhook messages
+  }
+  ```
+</ResponseField>
+
+### Channel and Guild
+
+<ResponseField name="getChannel()" type="MessageChannelUnion">
+  Returns the MessageChannel that this message was sent in.
+  
+  ```java
+  MessageChannel channel = message.getChannel();
+  channel.sendMessage("Reply").queue();
+  ```
+</ResponseField>
+
+<ResponseField name="getGuildChannel()" type="GuildMessageChannelUnion">
+  Returns the GuildMessageChannel that this message was sent in if it was sent in a Guild.
+  
+  ```java
+  if (message.isFromGuild()) {
+      GuildMessageChannel guildChannel = message.getGuildChannel();
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getGuild()" type="Guild">
+  Returns the Guild that this message was sent in.
+  
+  ```java
+  if (message.isFromGuild()) {
+      Guild guild = message.getGuild();
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isFromGuild()" type="boolean">
+  Whether this message was sent in a Guild.
+  
+  ```java
+  if (message.isFromGuild()) {
+      // Handle guild message
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getChannelType()" type="ChannelType">
+  Gets the ChannelType that this message was received from.
+  
+  ```java
+  ChannelType type = message.getChannelType();
+  if (type == ChannelType.PRIVATE) {
+      System.out.println("DM message");
+  }
+  ```
+</ResponseField>
+
+### Attachments and Embeds
+
+<ResponseField name="getAttachments()" type="List<Attachment>">
+  An immutable list of Attachments that are attached to this message.
+  
+  Requires `MESSAGE_CONTENT` intent.
+  
+  ```java
+  List<Message.Attachment> attachments = message.getAttachments();
+  for (Message.Attachment attachment : attachments) {
+      System.out.println("File: " + attachment.getFileName());
+      System.out.println("URL: " + attachment.getUrl());
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getEmbeds()" type="List<MessageEmbed>">
+  An immutable list of MessageEmbeds that are part of this Message.
+  
+  Requires `MESSAGE_CONTENT` intent.
+  
+  ```java
+  List<MessageEmbed> embeds = message.getEmbeds();
+  for (MessageEmbed embed : embeds) {
+      System.out.println("Title: " + embed.getTitle());
+  }
+  ```
+</ResponseField>
+
+### Components and Interactions
+
+<ResponseField name="getComponents()" type="List<MessageTopLevelComponentUnion>">
+  Layouts of interactive components, usually ActionRows.
+  
+  Requires `MESSAGE_CONTENT` intent.
+  
+  ```java
+  List<MessageTopLevelComponentUnion> components = message.getComponents();
+  ```
+</ResponseField>
+
+<ResponseField name="getButtons()" type="List<Button>">
+  All buttons attached to this message.
+  
+  ```java
+  List<Button> buttons = message.getButtons();
+  ```
+</ResponseField>
+
+### Reactions
+
+<ResponseField name="getReactions()" type="List<MessageReaction>">
+  All MessageReactions that are on this Message.
+  
+  ```java
+  List<MessageReaction> reactions = message.getReactions();
+  for (MessageReaction reaction : reactions) {
+      System.out.println(reaction.getEmoji().getName() + ": " + reaction.getCount());
+  }
+  ```
+</ResponseField>
+
+### Metadata
+
+<ResponseField name="getTimeCreated()" type="OffsetDateTime">
+  The time this message was created.
+  
+  ```java
+  OffsetDateTime created = message.getTimeCreated();
+  ```
+</ResponseField>
+
+<ResponseField name="isEdited()" type="boolean">
+  Returns whether or not this Message has been edited before.
+  
+  ```java
+  if (message.isEdited()) {
+      OffsetDateTime edited = message.getTimeEdited();
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getTimeEdited()" type="OffsetDateTime">
+  Provides the OffsetDateTime defining when this Message was last edited.
+  
+  Returns `null` if the message has never been edited.
+  
+  ```java
+  OffsetDateTime editedTime = message.getTimeEdited();
+  ```
+</ResponseField>
+
+<ResponseField name="getJumpUrl()" type="String">
+  Returns the jump-to URL for this message. Clicking this URL in Discord will jump to the message.
+  
+  ```java
+  String jumpUrl = message.getJumpUrl();
+  ```
+</ResponseField>
+
+<ResponseField name="isPinned()" type="boolean">
+  Whether this message is pinned in its channel.
+  
+  ```java
+  if (message.isPinned()) {
+      System.out.println("This is a pinned message");
+  }
+  ```
+</ResponseField>
+
+### References
+
+<ResponseField name="getMessageReference()" type="MessageReference">
+  Returns the MessageReference for this Message.
+  
+  Returns `null` if this message has no reference.
+  
+  ```java
+  MessageReference reference = message.getMessageReference();
+  if (reference != null) {
+      Message referenced = reference.getMessage();
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getReferencedMessage()" type="Message">
+  The referenced message for replies.
+  
+  Returns `null` if not a reply or if the referenced message wasn't loaded.
+  
+  ```java
+  Message replyTo = message.getReferencedMessage();
+  if (replyTo != null) {
+      System.out.println("Replying to: " + replyTo.getContentDisplay());
+  }
+  ```
+</ResponseField>
+
+### Mentions
+
+<ResponseField name="getMentions()" type="Mentions">
+  The Mentions used in this message.
+  
+  Includes Members, GuildChannels, Roles, and CustomEmojis.
+  
+  ```java
+  List<User> mentionedUsers = message.getMentions().getUsers();
+  List<Role> mentionedRoles = message.getMentions().getRoles();
+  boolean mentionsEveryone = message.getMentions().mentionsEveryone();
+  ```
+</ResponseField>
+
+## Message Actions
+
+### Editing
+
+<ParamField path="editMessage(CharSequence newContent)" type="MessageEditAction">
+  Edits this message and updates the content.
+  
+  ```java
+  message.editMessage("Updated content")
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="editMessage(MessageEditData data)" type="MessageEditAction">
+  Edits this message using the provided MessageEditData.
+  
+  ```java
+  MessageEditData edit = new MessageEditBuilder()
+      .setContent("New content")
+      .setEmbeds(embed)
+      .build();
+  
+  message.editMessage(edit).queue();
+  ```
+</ParamField>
+
+<ParamField path="editMessageEmbeds(Collection<MessageEmbed> embeds)" type="MessageEditAction">
+  Edits this message using the provided MessageEmbeds.
+  
+  ```java
+  message.editMessageEmbeds(newEmbed)
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="editMessageComponents(Collection<MessageTopLevelComponent> components)" type="MessageEditAction">
+  Edits this message using the provided components.
+  
+  ```java
+  message.editMessageComponents(ActionRow.of(button))
+      .queue();
+  ```
+</ParamField>
+
+### Deletion
+
+<ParamField path="delete()" type="AuditableRestAction<Void>">
+  Deletes this message from the channel.
+  
+  ```java
+  message.delete()
+      .reason("Inappropriate content")
+      .queue();
+  ```
+</ParamField>
+
+### Reactions
+
+<ParamField path="addReaction(Emoji emoji)" type="RestAction<Void>">
+  Adds a reaction to this message.
+  
+  ```java
+  message.addReaction(Emoji.fromUnicode("👍"))
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="removeReaction(Emoji emoji)" type="RestAction<Void>">
+  Removes the bot's reaction from this message.
+  
+  ```java
+  message.removeReaction(Emoji.fromUnicode("👍"))
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="clearReactions()" type="RestAction<Void>">
+  Removes all reactions from this message.
+  
+  ```java
+  message.clearReactions()
+      .queue();
+  ```
+</ParamField>
+
+### Pinning
+
+<ParamField path="pin()" type="RestAction<Void>">
+  Pins this message in its channel.
+  
+  ```java
+  message.pin()
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="unpin()" type="RestAction<Void>">
+  Unpins this message from its channel.
+  
+  ```java
+  message.unpin()
+      .queue();
+  ```
+</ParamField>
+
+### Replies
+
+<ParamField path="reply(CharSequence content)" type="MessageCreateAction">
+  Replies to this message with the provided content.
+  
+  ```java
+  message.reply("Got it!")
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="reply(MessageCreateData data)" type="MessageCreateAction">
+  Replies to this message with the provided MessageCreateData.
+  
+  ```java
+  message.reply(MessageCreateData.fromContent("Reply"))
+      .setEphemeral(true)
+      .queue();
+  ```
+</ParamField>
+
+## Constants
+
+<ResponseField name="MAX_CONTENT_LENGTH" type="int">
+  The maximum amount of characters sendable in one message: `2000`
+</ResponseField>
+
+<ResponseField name="MAX_FILE_SIZE" type="int">
+  The maximum sendable file size: `10485760` (10 MiB)
+</ResponseField>
+
+<ResponseField name="MAX_FILE_AMOUNT" type="int">
+  The maximum amount of files sendable within a single message: `10`
+</ResponseField>
+
+<ResponseField name="MAX_EMBED_COUNT" type="int">
+  The maximum amount of Embeds that can be added to one message: `10`
+</ResponseField>
+
+<ResponseField name="MAX_REACTIONS" type="int">
+  The maximum amount of reactions that can be added to one message: `20`
+</ResponseField>
+
+## Usage Example
+
+```java
+// Get message information
+Message message = event.getMessage();
+System.out.println("Content: " + message.getContentDisplay());
+System.out.println("Author: " + message.getAuthor().getAsTag());
+
+// Check attachments
+if (!message.getAttachments().isEmpty()) {
+    for (Message.Attachment attachment : message.getAttachments()) {
+        System.out.println("File: " + attachment.getFileName());
+    }
+}
+
+// Reply to message
+message.reply("Received your message!")
+    .queue();
+
+// Add reaction
+message.addReaction(Emoji.fromUnicode("✅"))
+    .queue();
+
+// Edit message (if bot's own message)
+if (message.getAuthor().equals(jda.getSelfUser())) {
+    message.editMessage("Updated content")
+        .queue();
+}
+
+// Delete message
+message.delete()
+    .reason("Cleanup")
+    .queueAfter(5, TimeUnit.SECONDS);
+
+// Check mentions
+List<User> mentioned = message.getMentions().getUsers();
+for (User user : mentioned) {
+    System.out.println("Mentioned: " + user.getAsTag());
+}
+```
+
+## See Also
+
+- [User](/api/entities/user)
+- [Member](/api/entities/member)
+- [Channel](/api/entities/channel)
+- [Guild](/api/entities/guild)

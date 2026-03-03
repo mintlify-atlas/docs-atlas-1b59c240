@@ -1,0 +1,321 @@
+---
+title: User
+description: API reference for the User entity in JDA
+---
+
+Represents a Discord User. Contains all publicly available information about a specific Discord User.
+
+## Overview
+
+The User interface represents a Discord user account across the entire platform. For guild-specific user information, see [Member](/api/entities/member).
+
+## Key Properties
+
+### Basic Information
+
+<ResponseField name="getId()" type="String">
+  The Snowflake id of this User.
+  
+  ```java
+  String userId = user.getId();
+  ```
+</ResponseField>
+
+<ResponseField name="getIdLong()" type="long">
+  The Snowflake id of this User as a primitive long.
+  
+  ```java
+  long userId = user.getIdLong();
+  ```
+</ResponseField>
+
+<ResponseField name="getName()" type="String">
+  The username of the User. Length is between 2 and 32 characters (inclusive).
+  
+  ```java
+  String username = user.getName();
+  ```
+</ResponseField>
+
+<ResponseField name="getGlobalName()" type="String">
+  The global display name of the user. This name is not unique and allows more characters.
+  
+  Returns `null` if unset.
+  
+  ```java
+  String globalName = user.getGlobalName();
+  ```
+</ResponseField>
+
+<ResponseField name="getEffectiveName()" type="String">
+  The name visible in the UI. If the global name is `null`, this returns the username instead.
+  
+  ```java
+  String displayName = user.getEffectiveName();
+  ```
+</ResponseField>
+
+<ResponseField name="getDiscriminator()" type="String">
+  The discriminator of the User. Used to differentiate between users with the same usernames.
+  
+  For most users, this will be `"0000"`. The primary use-case for discriminators is bot and guest accounts.
+  
+  ```java
+  String discriminator = user.getDiscriminator();
+  ```
+</ResponseField>
+
+<ResponseField name="getAsTag()" type="String">
+  The "tag" for this user (username#discriminator).
+  
+  Users without a discriminator use `#0000` instead.
+  
+  ```java
+  String tag = user.getAsTag(); // Example: "Username#0000"
+  ```
+</ResponseField>
+
+### Avatar and Profile
+
+<ResponseField name="getAvatarId()" type="String">
+  The Discord ID for this user's avatar image.
+  
+  Returns `null` if the user has not set an avatar.
+  
+  ```java
+  String avatarId = user.getAvatarId();
+  ```
+</ResponseField>
+
+<ResponseField name="getAvatarUrl()" type="String">
+  The URL for the user's avatar image.
+  
+  Returns `null` if the user has not set an avatar.
+  
+  ```java
+  String avatarUrl = user.getAvatarUrl();
+  ```
+</ResponseField>
+
+<ResponseField name="getEffectiveAvatarUrl()" type="String">
+  The URL for the user's avatar image. If they do not have an avatar set, this will return the URL of their default avatar.
+  
+  ```java
+  String avatarUrl = user.getEffectiveAvatarUrl();
+  ```
+</ResponseField>
+
+<ResponseField name="getDefaultAvatarUrl()" type="String">
+  The URL for the user's default avatar image.
+  
+  ```java
+  String defaultAvatar = user.getDefaultAvatarUrl();
+  ```
+</ResponseField>
+
+### Account Type
+
+<ResponseField name="isBot()" type="boolean">
+  Returns whether or not the given user is a Bot account (special badge in client, some different behavior).
+  
+  ```java
+  if (user.isBot()) {
+      System.out.println("This is a bot account");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isSystem()" type="boolean">
+  Returns whether or not the given user is a System account, which includes the urgent message account and the community updates bot.
+  
+  ```java
+  if (user.isSystem()) {
+      System.out.println("This is a system account");
+  }
+  ```
+</ResponseField>
+
+### User Flags
+
+<ResponseField name="getFlags()" type="EnumSet<UserFlag>">
+  Returns the UserFlags of this user.
+  
+  ```java
+  EnumSet<UserFlag> flags = user.getFlags();
+  if (flags.contains(UserFlag.VERIFIED_DEVELOPER)) {
+      System.out.println("Verified bot developer");
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="getFlagsRaw()" type="int">
+  Returns the bitmask representation of the UserFlags of this user.
+  
+  ```java
+  int flagsBitmask = user.getFlagsRaw();
+  ```
+</ResponseField>
+
+## User Actions
+
+### Direct Messaging
+
+<ParamField path="openPrivateChannel()" type="CacheRestAction<PrivateChannel>">
+  Opens a PrivateChannel with this User.
+  
+  If a channel has already been opened, it is immediately returned without contacting the Discord API.
+  
+  ```java
+  user.openPrivateChannel()
+      .flatMap(channel -> channel.sendMessage("Hello!"))
+      .queue();
+  ```
+</ParamField>
+
+<ParamField path="hasPrivateChannel()" type="boolean">
+  Whether the currently logged in user and this user have a currently open PrivateChannel.
+  
+  ```java
+  if (user.hasPrivateChannel()) {
+      System.out.println("DM channel exists");
+  }
+  ```
+</ParamField>
+
+### Profile Data
+
+<ParamField path="retrieveProfile()" type="CacheRestAction<Profile>">
+  Loads the user's Profile data including banner and accent color.
+  
+  ```java
+  user.retrieveProfile()
+      .queue(profile -> {
+          Color accent = profile.getAccentColor();
+          String banner = profile.getBannerUrl();
+      });
+  ```
+</ParamField>
+
+### Guild Information
+
+<ParamField path="getMutualGuilds()" type="List<Guild>">
+  Finds and collects all Guild instances that contain this User within the current JDA instance.
+  
+  ```java
+  List<Guild> mutualGuilds = user.getMutualGuilds();
+  System.out.println("Mutual servers: " + mutualGuilds.size());
+  ```
+</ParamField>
+
+## Static Methods
+
+<ParamField path="User.fromId(long id)" type="UserSnowflake">
+  Creates a User instance which only wraps an ID.
+  
+  Useful for operations that only require a user ID.
+  
+  ```java
+  UserSnowflake user = User.fromId(123456789L);
+  guild.ban(user).queue();
+  ```
+</ParamField>
+
+<ParamField path="User.fromId(String id)" type="UserSnowflake">
+  Creates a User instance which only wraps an ID (string version).
+  
+  ```java
+  UserSnowflake user = User.fromId("123456789");
+  ```
+</ParamField>
+
+## User.Profile
+
+The Profile class contains additional user information that requires an API request.
+
+<ResponseField name="getBannerId()" type="String">
+  The Discord Id for this user's banner image.
+  
+  Returns `null` if the user has not set a banner.
+</ResponseField>
+
+<ResponseField name="getBannerUrl()" type="String">
+  The URL for the user's banner image.
+  
+  Returns `null` if the user has not set a banner.
+</ResponseField>
+
+<ResponseField name="getAccentColor()" type="Color">
+  The user's accent color.
+  
+  Returns `null` if the user has not set an accent color.
+</ResponseField>
+
+<ResponseField name="getAccentColorRaw()" type="int">
+  The raw RGB value of this user's accent color.
+  
+  Defaults to `User.DEFAULT_ACCENT_COLOR_RAW` if not available.
+</ResponseField>
+
+## User Flags
+
+The UserFlag enum represents public badges and account types:
+
+- `STAFF` - Discord Employee
+- `PARTNER` - Partnered Server Owner
+- `HYPESQUAD` - HypeSquad Events
+- `BUG_HUNTER_LEVEL_1` - Bug Hunter Level 1
+- `BUG_HUNTER_LEVEL_2` - Bug Hunter Level 2
+- `HYPESQUAD_BRAVERY` - HypeSquad Bravery
+- `HYPESQUAD_BRILLIANCE` - HypeSquad Brilliance
+- `HYPESQUAD_BALANCE` - HypeSquad Balance
+- `EARLY_SUPPORTER` - Early Supporter
+- `VERIFIED_BOT` - Verified Bot
+- `VERIFIED_DEVELOPER` - Early Verified Bot Developer
+- `CERTIFIED_MODERATOR` - Discord Certified Moderator
+- `BOT_HTTP_INTERACTIONS` - HTTP Interactions Bot
+- `ACTIVE_DEVELOPER` - Active Developer
+
+## Usage Example
+
+```java
+// Get user information
+User user = event.getAuthor();
+System.out.println("Username: " + user.getName());
+System.out.println("Tag: " + user.getAsTag());
+System.out.println("ID: " + user.getId());
+
+// Check if bot
+if (user.isBot()) {
+    return; // Ignore bot messages
+}
+
+// Send DM
+user.openPrivateChannel()
+    .flatMap(channel -> channel.sendMessage("Hello!")
+    .queue();
+
+// Get profile with banner
+user.retrieveProfile()
+    .queue(profile -> {
+        String banner = profile.getBannerUrl();
+        if (banner != null) {
+            System.out.println("Banner: " + banner);
+        }
+    });
+
+// Check flags
+EnumSet<UserFlag> flags = user.getFlags();
+if (flags.contains(UserFlag.VERIFIED_DEVELOPER)) {
+    System.out.println("This user is a verified bot developer!");
+}
+
+// Get mutual servers
+List<Guild> mutualGuilds = user.getMutualGuilds();
+System.out.println("Shared servers: " + mutualGuilds.size());
+```
+
+## See Also
+
+- [Member](/api/entities/member) - Guild-specific user data
+- [Guild](/api/entities/guild)
+- [Message](/api/entities/message)

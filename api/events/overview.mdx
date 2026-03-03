@@ -1,0 +1,220 @@
+---
+title: "Event System Overview"
+description: "Learn how to listen to and handle events in JDA"
+---
+
+## Introduction
+
+JDA's event system allows you to respond to actions that occur on Discord. Events are fired when things happen, such as messages being sent, users joining guilds, or interactions being triggered.
+
+## Event Hierarchy
+
+All events in JDA implement the `GenericEvent` interface, which provides:
+
+- `getJDA()` - The JDA instance that fired this event
+- `getResponseNumber()` - A sequence number for ordering events
+- `getRawData()` - The raw gateway payload (if event passthrough is enabled)
+
+### Event Categories
+
+JDA events are organized into several categories:
+
+- **Message Events** - Message creation, updates, deletions, and reactions
+- **Guild Events** - Guild joins, leaves, updates, and member changes
+- **Interaction Events** - Slash commands, buttons, select menus, and modals
+- **Channel Events** - Channel creation, deletion, and updates
+- **User Events** - User updates and presence changes
+- **Voice Events** - Voice state changes
+- **Role Events** - Role creation, deletion, and updates
+
+## Listening to Events
+
+### Using ListenerAdapter
+
+The easiest way to handle events is by extending `ListenerAdapter` and overriding methods for the events you want to handle:
+
+```java
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+
+public class MyListener extends ListenerAdapter {
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (event.getAuthor().isBot()) return;
+        
+        String content = event.getMessage().getContentRaw();
+        if (content.equals("!ping")) {
+            event.getChannel().sendMessage("Pong!").queue();
+        }
+    }
+    
+    @Override
+    public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        event.getGuild().getSystemChannel()
+            .sendMessage("Welcome " + event.getMember().getAsMention() + "!")
+            .queue();
+    }
+}
+```
+
+### Registering Listeners
+
+After creating your listener, you need to register it with JDA:
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .addEventListeners(new MyListener())
+    .build();
+
+// Or register after building
+jda.addEventListener(new MyListener());
+```
+
+### Using EventListener Interface
+
+For more control, you can implement the `EventListener` interface directly:
+
+```java
+import net.dv8tion.jda.api.events.GenericEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.hooks.EventListener;
+
+public class CustomListener implements EventListener {
+    @Override
+    public void onEvent(GenericEvent event) {
+        if (event instanceof MessageReceivedEvent) {
+            MessageReceivedEvent msgEvent = (MessageReceivedEvent) event;
+            // Handle message event
+        }
+    }
+}
+```
+
+## Generic Events
+
+JDA provides generic events that fire for multiple related events:
+
+```java
+@Override
+public void onGenericMessage(GenericMessageEvent event) {
+    // Fires for all message-related events
+    System.out.println("Message event in channel: " + event.getChannel().getName());
+}
+
+@Override
+public void onGenericGuild(GenericGuildEvent event) {
+    // Fires for all guild-related events
+    System.out.println("Guild event in: " + event.getGuild().getName());
+}
+```
+
+## Event Requirements
+
+### Gateway Intents
+
+Many events require specific Gateway Intents to be enabled:
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .enableIntents(
+        GatewayIntent.GUILD_MESSAGES,       // For guild message events
+        GatewayIntent.DIRECT_MESSAGES,      // For DM events
+        GatewayIntent.GUILD_MEMBERS,        // For member events
+        GatewayIntent.MESSAGE_CONTENT       // For message content
+    )
+    .build();
+```
+
+### Privileged Intents
+
+Some intents are privileged and must be enabled in the Discord Developer Portal:
+
+- `GUILD_MEMBERS` - Required for member join/leave/update events
+- `GUILD_PRESENCES` - Required for presence update events
+- `MESSAGE_CONTENT` - Required to access message content
+
+## Best Practices
+
+### 1. Avoid Blocking Operations
+
+Event handlers should complete quickly. For long-running tasks, use asynchronous operations:
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    // Good - Non-blocking
+    event.getChannel().sendMessage("Processing...").queue(message -> {
+        // Do expensive work here
+        String result = doExpensiveWork();
+        message.editMessage(result).queue();
+    });
+    
+    // Bad - Blocks the event thread
+    String result = doExpensiveWork(); // Don't do this!
+    event.getChannel().sendMessage(result).complete();
+}
+```
+
+### 2. Check for Bots
+
+Often you want to ignore messages from bots:
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    if (event.getAuthor().isBot()) return;
+    // Handle message
+}
+```
+
+### 3. Handle Exceptions
+
+Wrap event handling in try-catch blocks to prevent one error from breaking all event processing:
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    try {
+        // Your event handling code
+    } catch (Exception e) {
+        logger.error("Error handling message", e);
+    }
+}
+```
+
+### 4. Use Specific Events
+
+Prefer specific events over generic ones for better performance:
+
+```java
+// Good - Specific event
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    // Only fires for received messages
+}
+
+// Less efficient - Generic event with filtering
+@Override
+public void onGenericMessage(GenericMessageEvent event) {
+    if (event instanceof MessageReceivedEvent) {
+        // Fires for all message events
+    }
+}
+```
+
+## Event Threading
+
+All events are fired on JDA's event thread pool. By default, events are processed sequentially to maintain order. You can configure this behavior:
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .setEventPool(Executors.newFixedThreadPool(4)) // Custom thread pool
+    .build();
+```
+
+## Next Steps
+
+- [Message Events](/api/events/message-events) - Handle messages, reactions, and polls
+- [Guild Events](/api/events/guild-events) - Handle guild and member events
+- [Interaction Events](/api/events/interaction-events) - Handle slash commands and components

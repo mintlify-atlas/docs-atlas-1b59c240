@@ -1,0 +1,532 @@
+---
+title: "Guild Events"
+description: "Guild and member-related events in JDA"
+---
+
+## Overview
+
+Guild events are fired when guilds (servers) are joined, left, updated, or when members perform actions within guilds.
+
+## Required Intents
+
+Guild events require specific Gateway Intents:
+
+- `GUILD_MEMBERS` - For member join/leave/update events (privileged)
+- `GUILD_PRESENCES` - For presence updates (privileged)
+- `GUILD_MODERATION` - For ban/unban events
+- `GUILD_VOICE_STATES` - For voice state updates
+
+```java
+JDA jda = JDABuilder.createDefault(token)
+    .enableIntents(
+        GatewayIntent.GUILD_MEMBERS,
+        GatewayIntent.GUILD_MODERATION,
+        GatewayIntent.GUILD_VOICE_STATES
+    )
+    .build();
+```
+
+## Guild Lifecycle Events
+
+### GuildReadyEvent
+
+Fired when a guild finishes loading during bot startup.
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildReady(GuildReadyEvent event) {
+    Guild guild = event.getGuild();
+    System.out.println("Guild ready: " + guild.getName());
+    System.out.println("Members: " + guild.getMemberCount());
+}
+```
+
+### GuildJoinEvent
+
+Fired when your bot joins a guild.
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildJoin(GuildJoinEvent event) {
+    Guild guild = event.getGuild();
+    
+    System.out.println("Joined guild: " + guild.getName());
+    System.out.println("Owner: " + guild.getOwner().getUser().getAsTag());
+    System.out.println("Member count: " + guild.getMemberCount());
+    
+    // Send a welcome message to the system channel
+    TextChannel systemChannel = guild.getSystemChannel();
+    if (systemChannel != null && systemChannel.canTalk()) {
+        systemChannel.sendMessage("Thanks for adding me!").queue();
+    }
+}
+```
+
+**Warning:** Discord has triggered mass GuildJoin events during outages. Be careful with automated actions.
+
+### GuildLeaveEvent
+
+Fired when your bot is removed from a guild or leaves voluntarily.
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildLeave(GuildLeaveEvent event) {
+    Guild guild = event.getGuild();
+    System.out.println("Left guild: " + guild.getName());
+    
+    // Clean up any data associated with this guild
+    cleanupGuildData(guild.getIdLong());
+}
+```
+
+### GuildAvailableEvent
+
+Fired when a guild becomes available after being unavailable.
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildAvailable(GuildAvailableEvent event) {
+    System.out.println("Guild is now available: " + event.getGuild().getName());
+}
+```
+
+### GuildUnavailableEvent
+
+Fired when a guild becomes unavailable (typically during Discord outages).
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildUnavailable(GuildUnavailableEvent event) {
+    System.out.println("Guild unavailable: " + event.getGuild().getName());
+}
+```
+
+### GuildTimeoutEvent
+
+Fired when a guild times out during startup.
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildTimeout(GuildTimeoutEvent event) {
+    System.out.println("Guild timed out: " + event.getGuildId());
+}
+```
+
+## Guild Moderation Events
+
+### GuildBanEvent
+
+Fired when a user is banned from a guild.
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildBan(GuildBanEvent event) {
+    Guild guild = event.getGuild();
+    User user = event.getUser();
+    
+    System.out.println(user.getAsTag() + " was banned from " + guild.getName());
+    
+    // Retrieve audit log to find who banned the user
+    guild.retrieveAuditLogs()
+        .type(ActionType.BAN)
+        .limit(1)
+        .queue(logs -> {
+            if (!logs.isEmpty()) {
+                AuditLogEntry entry = logs.get(0);
+                System.out.println("Banned by: " + entry.getUser().getAsTag());
+                System.out.println("Reason: " + entry.getReason());
+            }
+        });
+}
+```
+
+### GuildUnbanEvent
+
+Fired when a user is unbanned from a guild.
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildUnban(GuildUnbanEvent event) {
+    User user = event.getUser();
+    Guild guild = event.getGuild();
+    
+    System.out.println(user.getAsTag() + " was unbanned from " + guild.getName());
+}
+```
+
+### GuildAuditLogEntryCreateEvent
+
+Fired when a new audit log entry is created.
+
+**Package:** `net.dv8tion.jda.api.events.guild`
+
+```java
+@Override
+public void onGuildAuditLogEntryCreate(GuildAuditLogEntryCreateEvent event) {
+    AuditLogEntry entry = event.getEntry();
+    
+    System.out.println("Audit log entry: " + entry.getType());
+    System.out.println("Performed by: " + entry.getUser().getAsTag());
+    System.out.println("Reason: " + entry.getReason());
+}
+```
+
+## Member Events
+
+### GuildMemberJoinEvent
+
+Fired when a user joins a guild.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member`
+
+**Requires:** `GUILD_MEMBERS` intent (privileged)
+
+```java
+@Override
+public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+    Member member = event.getMember();
+    Guild guild = event.getGuild();
+    
+    System.out.println(member.getUser().getAsTag() + " joined " + guild.getName());
+    
+    // Send welcome message
+    TextChannel welcomeChannel = guild.getSystemChannel();
+    if (welcomeChannel != null) {
+        welcomeChannel.sendMessage(
+            "Welcome " + member.getAsMention() + "! You are member #" + guild.getMemberCount()
+        ).queue();
+    }
+    
+    // Auto-assign role
+    Role memberRole = guild.getRoleById("123456789");
+    if (memberRole != null) {
+        guild.addRoleToMember(member, memberRole).queue();
+    }
+}
+```
+
+### GuildMemberRemoveEvent
+
+Fired when a member leaves or is kicked from a guild.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member`
+
+**Requires:** `GUILD_MEMBERS` intent (privileged)
+
+```java
+@Override
+public void onGuildMemberRemove(GuildMemberRemoveEvent event) {
+    User user = event.getUser();
+    Guild guild = event.getGuild();
+    
+    System.out.println(user.getAsTag() + " left " + guild.getName());
+    
+    // Check if they were kicked by checking audit logs
+    guild.retrieveAuditLogs()
+        .type(ActionType.KICK)
+        .limit(1)
+        .queue(logs -> {
+            if (!logs.isEmpty() && logs.get(0).getTargetIdLong() == user.getIdLong()) {
+                System.out.println("Member was kicked");
+            }
+        });
+}
+```
+
+### GuildMemberRoleAddEvent
+
+Fired when roles are added to a member.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member`
+
+```java
+@Override
+public void onGuildMemberRoleAdd(GuildMemberRoleAddEvent event) {
+    Member member = event.getMember();
+    List<Role> addedRoles = event.getRoles();
+    
+    for (Role role : addedRoles) {
+        System.out.println(role.getName() + " added to " + member.getEffectiveName());
+    }
+}
+```
+
+### GuildMemberRoleRemoveEvent
+
+Fired when roles are removed from a member.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member`
+
+```java
+@Override
+public void onGuildMemberRoleRemove(GuildMemberRoleRemoveEvent event) {
+    Member member = event.getMember();
+    List<Role> removedRoles = event.getRoles();
+    
+    for (Role role : removedRoles) {
+        System.out.println(role.getName() + " removed from " + member.getEffectiveName());
+    }
+}
+```
+
+## Member Update Events
+
+### GuildMemberUpdateEvent
+
+Generic event for any member update.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member`
+
+```java
+@Override
+public void onGuildMemberUpdate(GuildMemberUpdateEvent event) {
+    System.out.println("Member updated: " + event.getMember().getEffectiveName());
+}
+```
+
+### GuildMemberUpdateNicknameEvent
+
+Fired when a member's nickname changes.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member.update`
+
+```java
+@Override
+public void onGuildMemberUpdateNickname(GuildMemberUpdateNicknameEvent event) {
+    String oldNick = event.getOldNickname();
+    String newNick = event.getNewNickname();
+    
+    System.out.println("Nickname changed from '" + oldNick + "' to '" + newNick + "'");
+}
+```
+
+**Key Methods:**
+- `getOldNickname()` - Previous nickname (null if none)
+- `getNewNickname()` - New nickname (null if removed)
+- `getMember()` - The member whose nickname changed
+
+### GuildMemberUpdateAvatarEvent
+
+Fired when a member's guild avatar changes.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member.update`
+
+```java
+@Override
+public void onGuildMemberUpdateAvatar(GuildMemberUpdateAvatarEvent event) {
+    String oldAvatar = event.getOldAvatarId();
+    String newAvatar = event.getNewAvatarId();
+    
+    if (newAvatar != null) {
+        System.out.println("New avatar URL: " + event.getMember().getEffectiveAvatarUrl());
+    }
+}
+```
+
+### GuildMemberUpdateBoostTimeEvent
+
+Fired when a member's boost time changes.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member.update`
+
+```java
+@Override
+public void onGuildMemberUpdateBoostTime(GuildMemberUpdateBoostTimeEvent event) {
+    OffsetDateTime newBoostTime = event.getNewTimeBoosted();
+    
+    if (newBoostTime != null) {
+        System.out.println(event.getMember().getEffectiveName() + " started boosting!");
+    } else {
+        System.out.println(event.getMember().getEffectiveName() + " stopped boosting");
+    }
+}
+```
+
+### GuildMemberUpdateTimeOutEvent
+
+Fired when a member is timed out or the timeout is removed.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member.update`
+
+```java
+@Override
+public void onGuildMemberUpdateTimeOut(GuildMemberUpdateTimeOutEvent event) {
+    OffsetDateTime oldTimeout = event.getOldTimeOutEnd();
+    OffsetDateTime newTimeout = event.getNewTimeOutEnd();
+    
+    if (newTimeout != null) {
+        System.out.println(event.getMember().getEffectiveName() + 
+            " timed out until: " + newTimeout);
+    } else {
+        System.out.println(event.getMember().getEffectiveName() + " timeout removed");
+    }
+}
+```
+
+### GuildMemberUpdatePendingEvent
+
+Fired when a member completes membership screening.
+
+**Package:** `net.dv8tion.jda.api.events.guild.member.update`
+
+```java
+@Override
+public void onGuildMemberUpdatePending(GuildMemberUpdatePendingEvent event) {
+    if (!event.getNewValue()) {
+        // Member completed screening
+        System.out.println(event.getMember().getEffectiveName() + " passed screening!");
+    }
+}
+```
+
+## Guild Update Events
+
+Guild update events fire when guild properties change.
+
+### GuildUpdateNameEvent
+
+**Package:** `net.dv8tion.jda.api.events.guild.update`
+
+```java
+@Override
+public void onGuildUpdateName(GuildUpdateNameEvent event) {
+    System.out.println("Guild renamed from '" + event.getOldName() + 
+        "' to '" + event.getNewName() + "'");
+}
+```
+
+### GuildUpdateIconEvent
+
+**Package:** `net.dv8tion.jda.api.events.guild.update`
+
+```java
+@Override
+public void onGuildUpdateIcon(GuildUpdateIconEvent event) {
+    String newIcon = event.getNewIconUrl();
+    System.out.println("Guild icon updated: " + newIcon);
+}
+```
+
+### GuildUpdateOwnerEvent
+
+**Package:** `net.dv8tion.jda.api.events.guild.update`
+
+```java
+@Override
+public void onGuildUpdateOwner(GuildUpdateOwnerEvent event) {
+    Member oldOwner = event.getOldOwner();
+    Member newOwner = event.getNewOwner();
+    
+    System.out.println("Ownership transferred from " + 
+        oldOwner.getEffectiveName() + " to " + newOwner.getEffectiveName());
+}
+```
+
+### Other Guild Update Events
+
+- `GuildUpdateAfkChannelEvent` - AFK channel changed
+- `GuildUpdateAfkTimeoutEvent` - AFK timeout changed
+- `GuildUpdateSystemChannelEvent` - System channel changed
+- `GuildUpdateBoostTierEvent` - Boost tier changed
+- `GuildUpdateBoostCountEvent` - Boost count changed
+- `GuildUpdateVerificationLevelEvent` - Verification level changed
+- `GuildUpdateMFALevelEvent` - MFA requirement changed
+
+## Voice Events
+
+### GuildVoiceUpdateEvent
+
+Fired when a member's voice state changes (joins/leaves/moves channels).
+
+**Package:** `net.dv8tion.jda.api.events.guild.voice`
+
+```java
+@Override
+public void onGuildVoiceUpdate(GuildVoiceUpdateEvent event) {
+    AudioChannel channelLeft = event.getChannelLeft();
+    AudioChannel channelJoined = event.getChannelJoined();
+    Member member = event.getMember();
+    
+    if (channelLeft == null) {
+        System.out.println(member.getEffectiveName() + " joined " + channelJoined.getName());
+    } else if (channelJoined == null) {
+        System.out.println(member.getEffectiveName() + " left " + channelLeft.getName());
+    } else {
+        System.out.println(member.getEffectiveName() + " moved from " + 
+            channelLeft.getName() + " to " + channelJoined.getName());
+    }
+}
+```
+
+### Voice State Events
+
+- `GuildVoiceMuteEvent` - Member muted/unmuted
+- `GuildVoiceDeafenEvent` - Member deafened/undeafened
+- `GuildVoiceSelfMuteEvent` - Member self-muted
+- `GuildVoiceSelfDeafenEvent` - Member self-deafened
+- `GuildVoiceStreamEvent` - Member started/stopped streaming
+- `GuildVoiceVideoEvent` - Member enabled/disabled video
+
+## Example: Welcome System
+
+```java
+import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+
+public class WelcomeSystem extends ListenerAdapter {
+    @Override
+    public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        Member member = event.getMember();
+        Guild guild = event.getGuild();
+        TextChannel channel = guild.getSystemChannel();
+        
+        if (channel == null || !channel.canTalk()) return;
+        
+        EmbedBuilder embed = new EmbedBuilder()
+            .setTitle("Welcome!")
+            .setDescription("Welcome " + member.getAsMention() + " to " + guild.getName() + "!")
+            .setThumbnail(member.getEffectiveAvatarUrl())
+            .addField("Member Count", String.valueOf(guild.getMemberCount()), true)
+            .addField("Account Created", member.getTimeCreated().toString(), true)
+            .setColor(0x00FF00);
+        
+        channel.sendMessageEmbeds(embed.build()).queue();
+        
+        // Auto-role
+        Role defaultRole = guild.getRolesByName("Member", true).stream()
+            .findFirst().orElse(null);
+        if (defaultRole != null) {
+            guild.addRoleToMember(member, defaultRole).queue();
+        }
+    }
+    
+    @Override
+    public void onGuildMemberRemove(GuildMemberRemoveEvent event) {
+        User user = event.getUser();
+        Guild guild = event.getGuild();
+        TextChannel channel = guild.getSystemChannel();
+        
+        if (channel == null || !channel.canTalk()) return;
+        
+        channel.sendMessage(user.getAsTag() + " has left the server.").queue();
+    }
+}
+```

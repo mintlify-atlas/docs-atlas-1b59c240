@@ -1,0 +1,295 @@
+---
+title: RestAction
+description: Handle asynchronous REST API requests with callbacks and futures
+---
+
+## Overview
+
+`RestAction<T>` is JDA's interface for making asynchronous requests to the Discord API. It provides a fluent API for chaining operations, handling errors, and managing timeouts.
+
+<Info>
+Most methods in JDA that interact with Discord return a `RestAction` that must be executed with `queue()`, `submit()`, or `complete()`.
+</Info>
+
+## Execution Methods
+
+### queue()
+
+Execute the request asynchronously with optional callbacks.
+
+```java
+// Fire and forget
+channel.sendMessage("Hello!").queue();
+
+// With success callback
+channel.sendMessage("Hello!").queue(message -> {
+    System.out.println("Sent: " + message.getId());
+});
+
+// With success and failure callbacks
+channel.sendMessage("Hello!").queue(
+    message -> System.out.println("Success: " + message.getId()),
+    error -> System.err.println("Failed: " + error.getMessage())
+);
+```
+
+### submit()
+
+Returns a `CompletableFuture<T>` for async/await patterns.
+
+```java
+CompletableFuture<Message> future = channel.sendMessage("Hello!").submit();
+
+future.thenAccept(message -> {
+    System.out.println("Sent: " + message.getId());
+});
+```
+
+### complete()
+
+<Warning>
+Blocking method! Use sparingly - blocks the current thread until the request completes.
+</Warning>
+
+```java
+Message message = channel.sendMessage("Hello!").complete();
+System.out.println("Sent: " + message.getId());
+```
+
+## Transformation Operators
+
+### map()
+
+Transform the result to a different type.
+
+```java
+RestAction<String> messageId = channel.sendMessage("Hello!")
+    .map(Message::getId);
+
+messageId.queue(id -> System.out.println("ID: " + id));
+```
+
+### flatMap()
+
+Chain another RestAction on the result.
+
+```java
+channel.sendMessage("Hello!")
+    .flatMap(message -> message.addReaction(Emoji.fromUnicode("👍")))
+    .queue();
+```
+
+### onSuccess()
+
+Run a callback without changing the return type.
+
+```java
+channel.sendMessage("Hello!")
+    .onSuccess(message -> System.out.println("Sent!"))
+    .flatMap(message -> message.pin())
+    .queue();
+```
+
+## Error Handling
+
+### onErrorMap()
+
+Recover from errors by providing a fallback value.
+
+```java
+RestAction<String> name = guild.retrieveMemberById(userId)
+    .map(Member::getEffectiveName)
+    .onErrorMap(error -> "Unknown User");
+```
+
+### onErrorFlatMap()
+
+Recover from errors with another RestAction.
+
+```java
+channel.retrieveMessageById(messageId)
+    .onErrorFlatMap(error -> channel.sendMessage("Message not found"))
+    .queue();
+```
+
+### mapToResult()
+
+Convert the RestAction to a `Result<T>` that can be success or failure.
+
+```java
+RestAction<Result<Message>> result = channel.retrieveMessageById(id)
+    .mapToResult();
+
+result.queue(r -> {
+    if (r.isSuccess()) {
+        System.out.println("Found: " + r.get().getContentRaw());
+    } else {
+        System.out.println("Error: " + r.getFailure().getMessage());
+    }
+});
+```
+
+## Combining Actions
+
+### and()
+
+Run two RestActions in parallel and combine their results.
+
+```java
+RestAction<String> combined = guild.retrieveMemberById(id1)
+    .and(guild.retrieveMemberById(id2),
+        (member1, member2) -> member1.getEffectiveName() + " and " + member2.getEffectiveName()
+    );
+```
+
+### allOf()
+
+Run multiple RestActions in parallel.
+
+```java
+List<RestAction<Message>> actions = Arrays.asList(
+    channel1.sendMessage("Hello!"),
+    channel2.sendMessage("Hi!"),
+    channel3.sendMessage("Hey!")
+);
+
+RestAction.allOf(actions).queue(messages -> {
+    System.out.println("Sent " + messages.size() + " messages");
+});
+```
+
+### zip()
+
+Combine multiple RestActions into a list of results.
+
+```java
+RestAction<List<Member>> members = RestAction.zip(
+    guild.retrieveMemberById(id1),
+    guild.retrieveMemberById(id2),
+    guild.retrieveMemberById(id3)
+);
+
+members.queue(list -> {
+    System.out.println("Retrieved " + list.size() + " members");
+});
+```
+
+## Delay Operations
+
+### delay()
+
+Delay the next operation in the chain.
+
+```java
+channel.sendMessage("This message will self-destruct in 10 seconds")
+    .delay(Duration.ofSeconds(10))
+    .flatMap(Message::delete)
+    .queue();
+```
+
+### queueAfter()
+
+Schedule the request to execute after a delay.
+
+```java
+channel.sendMessage("Delayed message")
+    .queueAfter(5, TimeUnit.SECONDS);
+```
+
+## Checks and Timeouts
+
+### setCheck()
+
+Add a condition that must be true before the request executes.
+
+```java
+BooleanSupplier condition = () -> System.currentTimeMillis() % 2 == 0;
+
+channel.sendMessage("Lucky message")
+    .setCheck(condition)
+    .queue(
+        success -> System.out.println("Check passed!"),
+        error -> System.out.println("Check failed!")
+    );
+```
+
+### timeout()
+
+Set a maximum time the request can take.
+
+```java
+channel.sendMessage("Fast message")
+    .timeout(5, TimeUnit.SECONDS)
+    .queue(
+        success -> System.out.println("Sent in time!"),
+        error -> System.out.println("Timeout!")
+    );
+```
+
+### deadline()
+
+Set an absolute timestamp deadline.
+
+```java
+long deadline = System.currentTimeMillis() + 10000; // 10 seconds from now
+
+channel.sendMessage("Message with deadline")
+    .deadline(deadline)
+    .queue();
+```
+
+## Complete Example
+
+Here's a complete example showing multiple RestAction features:
+
+```java
+public void sendWelcomeMessage(Guild guild, Member member) {
+    TextChannel channel = guild.getTextChannelById(welcomeChannelId);
+    if (channel == null) return;
+    
+    // Create welcome embed
+    MessageEmbed embed = new EmbedBuilder()
+        .setTitle("Welcome!")
+        .setDescription("Welcome to " + guild.getName() + ", " + member.getAsMention())
+        .setColor(Color.GREEN)
+        .build();
+    
+    // Send message, wait 30 seconds, then delete it
+    channel.sendMessageEmbeds(embed)
+        .flatMap(message -> message.addReaction(Emoji.fromUnicode("👋")))
+        .delay(Duration.ofSeconds(30))
+        .flatMap(message -> message.delete())
+        .queue(
+            success -> System.out.println("Welcome message sent and deleted"),
+            error -> System.err.println("Failed: " + error.getMessage())
+        );
+}
+```
+
+## Best Practices
+
+<Tip>
+**Always call an execution method!** A RestAction does nothing until you call `queue()`, `submit()`, or `complete()`.
+</Tip>
+
+```java
+// ❌ This does nothing!
+channel.sendMessage("Hello!");
+
+// ✅ This actually sends the message
+channel.sendMessage("Hello!").queue();
+```
+
+<Tip>
+**Prefer `queue()` over `complete()`** - Async operations are faster and don't block threads.
+</Tip>
+
+<Warning>
+**Don't ignore rate limits** - JDA handles them automatically with `queue()`, but `complete(true)` can bypass them and get your bot banned.
+</Warning>
+
+## Related Pages
+
+- [JDA Interface](/api/jda)
+- [Error Handling Guide](/guides/error-handling)
+- [API Reference](/api/rest-action)

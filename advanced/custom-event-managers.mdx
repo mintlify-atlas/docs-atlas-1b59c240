@@ -1,0 +1,482 @@
+---
+title: Custom Event Managers
+description: Implement custom event manager systems for advanced event handling
+---
+
+JDA's event system is flexible and allows you to implement custom event managers. This guide covers creating custom event managers for specialized event handling needs.
+
+## Event Manager Interface
+
+The `IEventManager` interface defines the contract for event managers:
+
+```java
+public interface IEventManager {
+    void register(Object listener);
+    void unregister(Object listener);
+    void handle(GenericEvent event);
+    List<Object> getRegisteredListeners();
+}
+```
+
+## Built-in Event Managers
+
+JDA provides two default implementations:
+
+### InterfacedEventManager
+
+The default event manager that uses the `EventListener` interface:
+
+```java
+import net.dv8tion.jda.api.hooks.EventListener;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+
+public class MyListener extends ListenerAdapter {
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        System.out.println("Message: " + event.getMessage().getContentRaw());
+    }
+}
+```
+
+### AnnotatedEventManager
+
+Uses the `@SubscribeEvent` annotation to mark event handler methods:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.hooks.AnnotatedEventManager;
+import net.dv8tion.jda.api.hooks.SubscribeEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+
+public class AnnotatedListener {
+    @SubscribeEvent
+    public void onMessage(MessageReceivedEvent event) {
+        System.out.println("Message: " + event.getMessage().getContentRaw());
+    }
+}
+
+// Usage
+JDABuilder.createDefault(token)
+    .setEventManager(new AnnotatedEventManager())
+    .addEventListeners(new AnnotatedListener())
+    .build();
+```
+
+## Creating a Custom Event Manager
+
+### Priority-Based Event Manager
+
+Implement an event manager that handles events based on listener priority:
+
+```java
+import net.dv8tion.jda.api.hooks.IEventManager;
+import net.dv8tion.jda.api.events.GenericEvent;
+import java.lang.annotation.*;
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+public class PriorityEventManager implements IEventManager {
+    private final Map<Class<?>, List<EventHandler>> handlers = new ConcurrentHashMap<>();
+    private final List<Object> listeners = new CopyOnWriteArrayList<>();
+    
+    @Override
+    public void register(Object listener) {
+        listeners.add(listener);
+        
+        for (Method method : listener.getClass().getMethods()) {
+            if (method.isAnnotationPresent(EventHandler.class)) {
+                Class<?>[] params = method.getParameterTypes();
+                if (params.length == 1 && GenericEvent.class.isAssignableFrom(params[0])) {
+                    Class<?> eventType = params[0];
+                    int priority = method.getAnnotation(EventHandler.class).priority();
+                    
+                    handlers.computeIfAbsent(eventType, k -> new ArrayList<>())
+                        .add(new HandlerMethod(listener, method, priority));
+                    
+                    // Sort by priority (higher = earlier execution)
+                    handlers.get(eventType).sort(
+                        Comparator.comparingInt(h -> -h.priority)
+                    );
+                }
+            }
+        }
+    }
+    
+    @Override
+    public void unregister(Object listener) {
+        listeners.remove(listener);
+        handlers.values().forEach(list -> 
+            list.removeIf(h -> h.listener == listener)
+        );
+    }
+    
+    @Override
+    public void handle(GenericEvent event) {
+        Class<?> eventClass = event.getClass();
+        
+        // Check all handler lists for matching event types
+        for (Map.Entry<Class<?>, List<HandlerMethod>> entry : handlers.entrySet()) {
+            if (entry.getKey().isAssignableFrom(eventClass)) {
+                for (HandlerMethod handler : entry.getValue()) {
+                    try {
+                        handler.method.invoke(handler.listener, event);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
+    
+    @Override
+    public List<Object> getRegisteredListeners() {
+        return new ArrayList<>(listeners);
+    }
+    
+    // Inner classes
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface EventHandler {
+        int priority() default 0;
+    }
+    
+    private static class HandlerMethod {
+        final Object listener;
+        final Method method;
+        final int priority;
+        
+        HandlerMethod(Object listener, Method method, int priority) {
+            this.listener = listener;
+            this.method = method;
+            this.priority = priority;
+            method.setAccessible(true);
+        }
+    }
+}
+```
+
+### Usage Example
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+
+public class PriorityListenerExample {
+    public static class HighPriorityListener {
+        @PriorityEventManager.EventHandler(priority = 100)
+        public void onMessage(MessageReceivedEvent event) {
+            System.out.println("High priority: " + event.getMessage());
+        }
+    }
+    
+    public static class LowPriorityListener {
+        @PriorityEventManager.EventHandler(priority = 1)
+        public void onMessage(MessageReceivedEvent event) {
+            System.out.println("Low priority: " + event.getMessage());
+        }
+    }
+    
+    public void build(String token) {
+        JDABuilder.createDefault(token)
+            .setEventManager(new PriorityEventManager())
+            .addEventListeners(
+                new HighPriorityListener(),
+                new LowPriorityListener()
+            )
+            .build();
+    }
+}
+```
+
+## Async Event Manager
+
+Handle events asynchronously to avoid blocking:
+
+```java
+import net.dv8tion.jda.api.hooks.IEventManager;
+import net.dv8tion.jda.api.hooks.EventListener;
+import net.dv8tion.jda.api.events.GenericEvent;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class AsyncEventManager implements IEventManager {
+    private final List<EventListener> listeners = new CopyOnWriteArrayList<>();
+    private final ExecutorService executor;
+    
+    public AsyncEventManager() {
+        this(Executors.newCachedThreadPool());
+    }
+    
+    public AsyncEventManager(ExecutorService executor) {
+        this.executor = executor;
+    }
+    
+    @Override
+    public void register(Object listener) {
+        if (listener instanceof EventListener) {
+            listeners.add((EventListener) listener);
+        } else {
+            throw new IllegalArgumentException(
+                "Listener must implement EventListener"
+            );
+        }
+    }
+    
+    @Override
+    public void unregister(Object listener) {
+        listeners.remove(listener);
+    }
+    
+    @Override
+    public void handle(GenericEvent event) {
+        for (EventListener listener : listeners) {
+            executor.submit(() -> {
+                try {
+                    listener.onEvent(event);
+                } catch (Throwable t) {
+                    System.err.println("Error handling event: " + t.getMessage());
+                    t.printStackTrace();
+                }
+            });
+        }
+    }
+    
+    @Override
+    public List<Object> getRegisteredListeners() {
+        return new ArrayList<>(listeners);
+    }
+    
+    public void shutdown() {
+        executor.shutdown();
+    }
+}
+```
+
+## Filtered Event Manager
+
+Filter events before dispatching them:
+
+```java
+import net.dv8tion.jda.api.hooks.IEventManager;
+import net.dv8tion.jda.api.hooks.InterfacedEventManager;
+import net.dv8tion.jda.api.events.GenericEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import java.util.function.Predicate;
+
+public class FilteredEventManager implements IEventManager {
+    private final IEventManager delegate = new InterfacedEventManager();
+    private final Predicate<GenericEvent> filter;
+    
+    public FilteredEventManager(Predicate<GenericEvent> filter) {
+        this.filter = filter;
+    }
+    
+    @Override
+    public void register(Object listener) {
+        delegate.register(listener);
+    }
+    
+    @Override
+    public void unregister(Object listener) {
+        delegate.unregister(listener);
+    }
+    
+    @Override
+    public void handle(GenericEvent event) {
+        if (filter.test(event)) {
+            delegate.handle(event);
+        }
+    }
+    
+    @Override
+    public List<Object> getRegisteredListeners() {
+        return delegate.getRegisteredListeners();
+    }
+}
+
+// Usage: Only handle messages from non-bots
+FilteredEventManager manager = new FilteredEventManager(event -> {
+    if (event instanceof MessageReceivedEvent) {
+        MessageReceivedEvent msgEvent = (MessageReceivedEvent) event;
+        return !msgEvent.getAuthor().isBot();
+    }
+    return true;
+});
+```
+
+## Event Metrics Manager
+
+Track event handling metrics:
+
+```java
+import net.dv8tion.jda.api.hooks.IEventManager;
+import net.dv8tion.jda.api.hooks.InterfacedEventManager;
+import net.dv8tion.jda.api.events.GenericEvent;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+public class MetricsEventManager implements IEventManager {
+    private final IEventManager delegate = new InterfacedEventManager();
+    private final Map<Class<?>, AtomicLong> eventCounts = new ConcurrentHashMap<>();
+    private final Map<Class<?>, AtomicLong> totalTime = new ConcurrentHashMap<>();
+    
+    @Override
+    public void register(Object listener) {
+        delegate.register(listener);
+    }
+    
+    @Override
+    public void unregister(Object listener) {
+        delegate.unregister(listener);
+    }
+    
+    @Override
+    public void handle(GenericEvent event) {
+        Class<?> eventClass = event.getClass();
+        long startTime = System.nanoTime();
+        
+        try {
+            delegate.handle(event);
+        } finally {
+            long duration = System.nanoTime() - startTime;
+            
+            eventCounts.computeIfAbsent(eventClass, k -> new AtomicLong())
+                .incrementAndGet();
+            totalTime.computeIfAbsent(eventClass, k -> new AtomicLong())
+                .addAndGet(duration);
+        }
+    }
+    
+    @Override
+    public List<Object> getRegisteredListeners() {
+        return delegate.getRegisteredListeners();
+    }
+    
+    public Map<String, EventMetrics> getMetrics() {
+        Map<String, EventMetrics> metrics = new HashMap<>();
+        
+        for (Map.Entry<Class<?>, AtomicLong> entry : eventCounts.entrySet()) {
+            Class<?> eventClass = entry.getKey();
+            long count = entry.getValue().get();
+            long time = totalTime.get(eventClass).get();
+            
+            metrics.put(
+                eventClass.getSimpleName(),
+                new EventMetrics(count, time, time / count)
+            );
+        }
+        
+        return metrics;
+    }
+    
+    public static class EventMetrics {
+        public final long count;
+        public final long totalNanos;
+        public final long avgNanos;
+        
+        public EventMetrics(long count, long totalNanos, long avgNanos) {
+            this.count = count;
+            this.totalNanos = totalNanos;
+            this.avgNanos = avgNanos;
+        }
+    }
+}
+```
+
+<Warning>
+  When implementing a custom event manager, ensure it's thread-safe. JDA may call the `handle()` method from multiple threads simultaneously.
+</Warning>
+
+## Configuring Event Managers
+
+Set your custom event manager during JDA initialization:
+
+```java
+import net.dv8tion.jda.api.JDABuilder;
+
+public class CustomManagerSetup {
+    public void build(String token) {
+        // Priority-based manager
+        JDABuilder.createDefault(token)
+            .setEventManager(new PriorityEventManager())
+            .build();
+        
+        // Async manager
+        JDABuilder.createDefault(token)
+            .setEventManager(new AsyncEventManager())
+            .build();
+        
+        // Metrics manager
+        MetricsEventManager metricsManager = new MetricsEventManager();
+        JDABuilder.createDefault(token)
+            .setEventManager(metricsManager)
+            .build();
+        
+        // Later, retrieve metrics
+        Map<String, MetricsEventManager.EventMetrics> metrics = 
+            metricsManager.getMetrics();
+    }
+}
+```
+
+## Best Practices
+
+1. **Thread safety**: Ensure your event manager is thread-safe, especially when managing listener lists
+2. **Error handling**: Always catch and handle exceptions in event handlers to prevent crashes
+3. **Performance**: Avoid heavy processing in the `handle()` method; delegate to thread pools if needed
+4. **Documentation**: Clearly document your event manager's behavior and requirements
+5. **Testing**: Thoroughly test your event manager with various event types and listener configurations
+6. **Delegation**: Consider delegating to built-in managers when possible to leverage tested implementations
+
+## Common Use Cases
+
+### Event Debouncing
+
+```java
+// Prevent rapid-fire event handling
+public class DebouncedEventManager implements IEventManager {
+    private final Map<Class<?>, Long> lastEventTime = new ConcurrentHashMap<>();
+    private final long debounceMillis;
+    private final IEventManager delegate;
+    
+    public DebouncedEventManager(long debounceMillis) {
+        this.debounceMillis = debounceMillis;
+        this.delegate = new InterfacedEventManager();
+    }
+    
+    @Override
+    public void handle(GenericEvent event) {
+        Class<?> eventClass = event.getClass();
+        long now = System.currentTimeMillis();
+        Long last = lastEventTime.get(eventClass);
+        
+        if (last == null || now - last >= debounceMillis) {
+            lastEventTime.put(eventClass, now);
+            delegate.handle(event);
+        }
+    }
+    
+    // ... other methods
+}
+```
+
+### Event Logging
+
+```java
+// Log all events for debugging
+public class LoggingEventManager implements IEventManager {
+    private final IEventManager delegate = new InterfacedEventManager();
+    
+    @Override
+    public void handle(GenericEvent event) {
+        System.out.println("[EVENT] " + event.getClass().getSimpleName());
+        delegate.handle(event);
+    }
+    
+    // ... other methods
+}
+```

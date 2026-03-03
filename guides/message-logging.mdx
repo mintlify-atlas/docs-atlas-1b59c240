@@ -1,0 +1,374 @@
+---
+title: Building a Message Logging Bot
+description: Create a bot that logs messages and reactions using event listeners
+---
+
+This guide demonstrates how to build a message logging bot that listens for messages and reactions across your Discord server.
+
+## Overview
+
+You'll learn how to:
+- Handle message events from guilds and DMs
+- Process reactions on messages
+- Work with channel types
+- Format and display message information
+
+## Prerequisites
+
+- Completed the [Creating a Bot](/guides/creating-a-bot) guide
+- Bot token ready
+- Gateway intents enabled for messages and reactions
+
+## Required Gateway Intents
+
+<Warning>
+This bot requires the **MESSAGE_CONTENT** privileged intent, which must be enabled in the [Discord Developer Portal](https://discord.com/developers/applications).
+</Warning>
+
+Message logging requires these intents:
+
+```java
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
+
+EnumSet<GatewayIntent> intents = EnumSet.of(
+    GatewayIntent.GUILD_MESSAGES,           // Messages in servers
+    GatewayIntent.DIRECT_MESSAGES,          // Direct messages
+    GatewayIntent.MESSAGE_CONTENT,          // Access to message content
+    GatewayIntent.GUILD_MESSAGE_REACTIONS,  // Reactions in servers
+    GatewayIntent.DIRECT_MESSAGE_REACTIONS  // Reactions in DMs
+);
+```
+
+## Complete Example
+
+Here's the full message logger implementation based on MessageLoggerExample.java:
+
+```java
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
+import javax.annotation.Nonnull;
+import java.util.EnumSet;
+
+public class MessageLoggerExample extends ListenerAdapter {
+    // Define emojis to detect
+    public static final Emoji HEART = Emoji.fromUnicode("U+2764");
+
+    public static void main(String[] args) throws InterruptedException {
+        String token = System.getenv("BOT_TOKEN");
+
+        EnumSet<GatewayIntent> intents = EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.DIRECT_MESSAGES,
+            GatewayIntent.MESSAGE_CONTENT,
+            GatewayIntent.GUILD_MESSAGE_REACTIONS,
+            GatewayIntent.DIRECT_MESSAGE_REACTIONS
+        );
+
+        JDA jda = JDABuilder.createLight(token, intents)
+            .addEventListeners(new MessageLoggerExample())
+            .setActivity(Activity.watching("your messages"))
+            .build();
+
+        jda.getRestPing().queue(ping ->
+            System.out.println("Logged in with ping: " + ping)
+        );
+
+        jda.awaitReady();
+        System.out.println("Guilds: " + jda.getGuildCache().size());
+    }
+
+    @Override
+    public void onMessageReceived(@Nonnull MessageReceivedEvent event) {
+        User author = event.getAuthor();
+        MessageChannelUnion channel = event.getChannel();
+        Message message = event.getMessage();
+
+        // Check if message is from a guild/server
+        if (event.isFromGuild()) {
+            String guildName = event.getGuild().getName();
+            String printableContent = message.getContentDisplay();
+
+            System.out.printf(
+                "[%s] [%#s] %#s: %s\n",
+                guildName,
+                channel,    // %#s formats as #channel-name
+                author,     // %#s formats as Username#1234 or Username
+                printableContent
+            );
+        } else {
+            // Message from a private channel
+            System.out.printf(
+                "[direct] %#s: %s\n",
+                author,
+                message.getContentDisplay()
+            );
+        }
+
+        // Handle different channel types
+        handleChannelTypes(channel);
+    }
+
+    @Override
+    public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
+        if (event.getEmoji().equals(HEART)) {
+            System.out.println("A user loved a message!");
+        }
+    }
+
+    private void handleChannelTypes(MessageChannelUnion channel) {
+        // Check for text channels
+        if (channel.getType() == ChannelType.TEXT) {
+            System.out.println("The channel topic is " + 
+                channel.asTextChannel().getTopic());
+        }
+
+        // Check for thread channels
+        if (channel.getType().isThread()) {
+            String channelName = channel.asThreadChannel()
+                .getParentChannel()
+                .getName();
+
+            System.out.println("This thread is part of channel #" + channelName);
+        }
+    }
+}
+```
+
+## Implementation Breakdown
+
+<Steps>
+  <Step title="Set Up the Event Listener">
+    Create a class that extends `ListenerAdapter` and override the event methods you need:
+
+    ```java
+    public class MessageLoggerExample extends ListenerAdapter {
+        @Override
+        public void onMessageReceived(MessageReceivedEvent event) {
+            // Handle messages
+        }
+
+        @Override
+        public void onMessageReactionAdd(MessageReactionAddEvent event) {
+            // Handle reactions
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Configure and Build JDA">
+    Use `createLight()` for a minimal cache profile since we're just logging:
+
+    ```java
+    JDA jda = JDABuilder.createLight(token, intents)
+        .addEventListeners(new MessageLoggerExample())
+        .setActivity(Activity.watching("your messages"))
+        .build();
+    ```
+  </Step>
+
+  <Step title="Handle Message Events">
+    Extract information from the event:
+
+    ```java
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        User author = event.getAuthor();
+        Message message = event.getMessage();
+        MessageChannelUnion channel = event.getChannel();
+        
+        // Your logging logic here
+    }
+    ```
+  </Step>
+
+  <Step title="Distinguish Between Guild and DM Messages">
+    Use `event.isFromGuild()` to check the message source:
+
+    ```java
+    if (event.isFromGuild()) {
+        String guildName = event.getGuild().getName();
+        // Handle guild message
+    } else {
+        // Handle DM
+    }
+    ```
+  </Step>
+</Steps>
+
+## Working with Message Content
+
+### Getting Message Content
+
+JDA provides different methods for accessing message content:
+
+```java
+Message message = event.getMessage();
+
+// Raw content with mentions intact
+String raw = message.getContentRaw();
+// Example: "Hello <@123456789>!"
+
+// Display content with mentions converted to readable format
+String display = message.getContentDisplay();
+// Example: "Hello @Username!"
+
+// Stripped content with mentions removed
+String stripped = message.getContentStripped();
+// Example: "Hello !"
+```
+
+<Tip>
+Use `getContentDisplay()` for logging as it provides the most readable output.
+</Tip>
+
+## Working with Reactions
+
+Detect specific emoji reactions on messages:
+
+```java
+import net.dv8tion.jda.api.entities.emoji.Emoji;
+
+public class MyBot extends ListenerAdapter {
+    // Define emojis using Unicode codepoints
+    public static final Emoji HEART = Emoji.fromUnicode("U+2764");
+    public static final Emoji THUMBS_UP = Emoji.fromUnicode("U+1F44D");
+
+    @Override
+    public void onMessageReactionAdd(MessageReactionAddEvent event) {
+        Emoji emoji = event.getEmoji();
+        
+        if (emoji.equals(HEART)) {
+            System.out.println("Someone reacted with a heart!");
+        } else if (emoji.equals(THUMBS_UP)) {
+            System.out.println("Someone gave a thumbs up!");
+        }
+    }
+}
+```
+
+<Note>
+Find Unicode codepoints for emojis at [Emojipedia](https://emojipedia.org/).
+</Note>
+
+## Channel Type Specialization
+
+The `MessageChannelUnion` can represent different channel types. Use specialization to access type-specific features:
+
+```java
+MessageChannelUnion channel = event.getChannel();
+
+// Check the channel type
+ChannelType type = channel.getType();
+
+switch (type) {
+    case TEXT:
+        // Cast to TextChannel to access text-specific features
+        String topic = channel.asTextChannel().getTopic();
+        System.out.println("Topic: " + topic);
+        break;
+    
+    case VOICE:
+        // Cast to VoiceChannel
+        int userLimit = channel.asVoiceChannel().getUserLimit();
+        break;
+    
+    case PRIVATE:
+        // Cast to PrivateChannel
+        User recipient = channel.asPrivateChannel().getUser();
+        break;
+}
+
+// Check if channel is a thread
+if (channel.getType().isThread()) {
+    String parentName = channel.asThreadChannel()
+        .getParentChannel()
+        .getName();
+}
+```
+
+## Formatting Output
+
+JDA entities support special formatting in `printf`:
+
+```java
+User user = event.getAuthor();
+MessageChannel channel = event.getChannel();
+
+// %s - toString() output
+System.out.printf("%s\n", user);
+// Output: U:Username(123456789)
+
+// %#s - "as tag" format for users, "#name" for channels
+System.out.printf("%#s\n", user);
+// Output: Username or Username#1234
+
+System.out.printf("%#s\n", channel);
+// Output: #general
+```
+
+## Filtering Messages
+
+Common filtering patterns:
+
+```java
+@Override
+public void onMessageReceived(MessageReceivedEvent event) {
+    User author = event.getAuthor();
+    
+    // Ignore bot messages
+    if (author.isBot()) {
+        return;
+    }
+    
+    // Ignore system messages
+    if (author.isSystem()) {
+        return;
+    }
+    
+    // Only process guild messages
+    if (!event.isFromGuild()) {
+        return;
+    }
+    
+    // Only process messages with content
+    if (event.getMessage().getContentRaw().isEmpty()) {
+        return;
+    }
+    
+    // Your logic here
+}
+```
+
+## Best Practices
+
+<Tip>
+**Performance Tips:**
+- Use `createLight()` for logging bots that don't need member cache
+- Filter out bot messages early to reduce processing
+- Only enable the intents you actually need
+</Tip>
+
+<Warning>
+**Privacy Considerations:**
+- Be transparent about logging user messages
+- Store logs securely and consider data retention policies
+- Respect user privacy settings and Discord's Terms of Service
+</Warning>
+
+## Next Steps
+
+- [Implement slash commands](/guides/slash-commands) for bot configuration
+- [Handle interactions](/guides/interactions) to create moderation tools
+- [Learn error handling](/guides/error-handling) for production bots

@@ -1,122 +1,163 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "JDA (Java Discord API)",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#5865F2",
+    "light": "#7289DA",
+    "dark": "#4752C4"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/discord-jda/JDA"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/discord-jda/JDA"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "core-concepts/jda-builder",
+              "core-concepts/gateway-intents",
+              "core-concepts/rest-action",
+              "core-concepts/event-system",
+              "core-concepts/caching"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/creating-a-bot",
+              "guides/message-logging",
+              "guides/slash-commands",
+              "guides/interactions",
+              "guides/audio-connections",
+              "guides/sharding",
+              "guides/error-handling"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Advanced Topics",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "advanced/rate-limiting",
+              "advanced/member-cache-policy",
+              "advanced/custom-event-managers",
+              "advanced/threading-configuration"
+            ]
+          },
+          {
+            "group": "Migration & Troubleshooting",
+            "pages": [
+              "migration/breaking-changes",
+              "troubleshooting/common-issues",
+              "troubleshooting/faq"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core API",
             "pages": [
-              "api-reference/introduction"
+              "api/jda",
+              "api/jda-builder",
+              "api/rest-action"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Entities",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/entities/guild",
+              "api/entities/member",
+              "api/entities/user",
+              "api/entities/message",
+              "api/entities/channel",
+              "api/entities/role"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api/events/overview",
+              "api/events/message-events",
+              "api/events/guild-events",
+              "api/events/interaction-events"
+            ]
+          },
+          {
+            "group": "Interactions",
+            "pages": [
+              "api/interactions/slash-commands",
+              "api/interactions/buttons",
+              "api/interactions/select-menus",
+              "api/interactions/modals"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/utilities/embed-builder",
+              "api/utilities/permission",
+              "api/utilities/gateway-intent"
+            ]
+          },
+          {
+            "group": "Audio",
+            "pages": [
+              "api/audio/audio-manager",
+              "api/audio/audio-send-handler",
+              "api/audio/audio-receive-handler"
+            ]
+          },
+          {
+            "group": "Sharding",
+            "pages": [
+              "api/sharding/shard-manager",
+              "api/sharding/default-shard-manager-builder"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Basic Examples",
+            "pages": [
+              "examples/hello-world",
+              "examples/message-logger",
+              "examples/slash-bot"
+            ]
+          },
+          {
+            "group": "Advanced Examples",
+            "pages": [
+              "examples/components",
+              "examples/audio-echo",
+              "examples/localization"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

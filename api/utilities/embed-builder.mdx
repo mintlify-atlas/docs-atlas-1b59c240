@@ -1,0 +1,479 @@
+---
+title: EmbedBuilder
+description: Builder system for creating rich message embeds with customizable fields, colors, images, and formatting
+---
+
+# EmbedBuilder
+
+Builder system used to build `MessageEmbed` objects. Embeds allow you to send rich, formatted messages with titles, descriptions, fields, images, and more.
+
+## Constructor
+
+### EmbedBuilder()
+
+Constructs a new EmbedBuilder instance.
+
+```java
+EmbedBuilder embed = new EmbedBuilder();
+```
+
+### EmbedBuilder(EmbedBuilder builder)
+
+Creates an EmbedBuilder using fields from an existing builder.
+
+```java
+EmbedBuilder newEmbed = new EmbedBuilder(existingBuilder);
+```
+
+### EmbedBuilder(MessageEmbed embed)
+
+Creates an EmbedBuilder using fields from an existing embed.
+
+```java
+EmbedBuilder newEmbed = new EmbedBuilder(existingEmbed);
+```
+
+## Static Methods
+
+### fromData(DataObject data)
+
+Creates an instance from a serialized `DataObject`. This is the inverse of `MessageEmbed.toData()`.
+
+```java
+DataObject data = // ... serialized embed data
+EmbedBuilder embed = EmbedBuilder.fromData(data);
+```
+
+## Builder Methods
+
+### setTitle(String title)
+
+Sets the title of the embed.
+
+**Parameters:**
+- `title` - The title text (max 256 characters)
+
+**Returns:** The builder instance
+
+```java
+embed.setTitle("Welcome to JDA!");
+```
+
+### setTitle(String title, String url)
+
+Sets the title with a clickable URL.
+
+**Parameters:**
+- `title` - The title text (max 256 characters)
+- `url` - The URL the title links to (must be http/https)
+
+**Returns:** The builder instance
+
+```java
+embed.setTitle("JDA Documentation", "https://docs.jda.wiki");
+```
+
+### setUrl(String url)
+
+Sets the URL of the embed. Used with title for clickable hyperlinks. If multiple embeds in a message use the same URL, Discord merges them into a gallery view.
+
+**Parameters:**
+- `url` - The URL (must be http/https, max 2048 characters)
+
+**Returns:** The builder instance
+
+```java
+embed.setUrl("https://github.com/discord-jda/JDA");
+```
+
+### setDescription(CharSequence description)
+
+Sets the description of the embed. This is the main text content.
+
+**Parameters:**
+- `description` - The description text (max 4096 characters)
+
+**Returns:** The builder instance
+
+```java
+embed.setDescription("This is a detailed description of the embed.");
+```
+
+### appendDescription(CharSequence description)
+
+Appends text to the existing description.
+
+**Parameters:**
+- `description` - The text to append (total max 4096 characters)
+
+**Returns:** The builder instance
+
+```java
+embed.setDescription("First line\n")
+     .appendDescription("Second line\n")
+     .appendDescription("Third line");
+```
+
+### getDescriptionBuilder()
+
+Returns the `StringBuilder` used to build the description. Useful for advanced manipulation.
+
+**Returns:** StringBuilder with current description
+
+```java
+StringBuilder desc = embed.getDescriptionBuilder();
+desc.append("Added text");
+```
+
+### setColor(Color color)
+
+Sets the color of the embed's side bar.
+
+**Parameters:**
+- `color` - The color (use `null` for default)
+
+**Returns:** The builder instance
+
+```java
+import java.awt.Color;
+
+embed.setColor(Color.BLUE);
+embed.setColor(new Color(255, 0, 0)); // Red
+```
+
+### setColor(int color)
+
+Sets the color using a raw RGB integer value.
+
+**Parameters:**
+- `color` - The raw RGB value
+
+**Returns:** The builder instance
+
+```java
+embed.setColor(0xFF5733); // Orange
+```
+
+### setTimestamp(TemporalAccessor temporal)
+
+Sets the timestamp shown at the bottom of the embed.
+
+**Parameters:**
+- `temporal` - The timestamp (typically `Instant` or `OffsetDateTime`)
+
+**Returns:** The builder instance
+
+```java
+import java.time.Instant;
+
+embed.setTimestamp(Instant.now());
+```
+
+### setThumbnail(String url)
+
+Sets a small thumbnail image in the top-right corner.
+
+**Parameters:**
+- `url` - The image URL (http/https or `attachment://filename.ext`)
+
+**Returns:** The builder instance
+
+```java
+embed.setThumbnail("https://example.com/image.png");
+
+// Using uploaded attachment
+embed.setThumbnail("attachment://cat.png");
+channel.sendFiles(FileUpload.fromData(file, "cat.png"))
+       .setEmbeds(embed.build())
+       .queue();
+```
+
+### setImage(String url)
+
+Sets a large image displayed in the embed body.
+
+**Parameters:**
+- `url` - The image URL (http/https or `attachment://filename.ext`)
+
+**Returns:** The builder instance
+
+```java
+embed.setImage("https://example.com/banner.png");
+
+// Using uploaded attachment
+embed.setImage("attachment://banner.png");
+channel.sendFiles(FileUpload.fromData(file, "banner.png"))
+       .setEmbeds(embed.build())
+       .queue();
+```
+
+### setAuthor(String name)
+
+Sets the author name displayed at the top of the embed.
+
+**Parameters:**
+- `name` - The author name (max 256 characters)
+
+**Returns:** The builder instance
+
+```java
+embed.setAuthor("Bot Name");
+```
+
+### setAuthor(String name, String url)
+
+Sets the author with a clickable URL.
+
+**Parameters:**
+- `name` - The author name (max 256 characters)
+- `url` - The URL the name links to (must be http/https)
+
+**Returns:** The builder instance
+
+```java
+embed.setAuthor("GitHub", "https://github.com");
+```
+
+### setAuthor(String name, String url, String iconUrl)
+
+Sets the author with a URL and icon.
+
+**Parameters:**
+- `name` - The author name (max 256 characters)
+- `url` - The URL the name links to (must be http/https)
+- `iconUrl` - The icon image URL (http/https or `attachment://`)
+
+**Returns:** The builder instance
+
+```java
+embed.setAuthor("User", "https://example.com", "https://example.com/avatar.png");
+```
+
+### setFooter(String text)
+
+Sets the footer text displayed at the bottom of the embed.
+
+**Parameters:**
+- `text` - The footer text (max 2048 characters)
+
+**Returns:** The builder instance
+
+```java
+embed.setFooter("Requested by User#1234");
+```
+
+### setFooter(String text, String iconUrl)
+
+Sets the footer with an icon.
+
+**Parameters:**
+- `text` - The footer text (max 2048 characters)
+- `iconUrl` - The icon image URL (http/https or `attachment://`)
+
+**Returns:** The builder instance
+
+```java
+embed.setFooter("JDA Bot", "https://example.com/icon.png");
+```
+
+### addField(String name, String value, boolean inline)
+
+Adds a field to the embed. Fields are displayed in rows.
+
+**Parameters:**
+- `name` - The field name/title (max 256 characters)
+- `value` - The field value/content (max 1024 characters)
+- `inline` - Whether the field displays inline with others
+
+**Returns:** The builder instance
+
+```java
+embed.addField("Field 1", "Value 1", true)
+     .addField("Field 2", "Value 2", true)
+     .addField("Long Field", "This field takes the full width", false);
+```
+
+### addField(MessageEmbed.Field field)
+
+Adds a field object to the embed.
+
+**Parameters:**
+- `field` - The field to add
+
+**Returns:** The builder instance
+
+```java
+MessageEmbed.Field field = new MessageEmbed.Field("Name", "Value", true);
+embed.addField(field);
+```
+
+### addBlankField(boolean inline)
+
+Adds an empty field for spacing.
+
+**Parameters:**
+- `inline` - Whether the blank field is inline
+
+**Returns:** The builder instance
+
+```java
+embed.addField("Field 1", "Value", true)
+     .addBlankField(true) // Spacing
+     .addField("Field 2", "Value", true);
+```
+
+### clearFields()
+
+Removes all fields from the embed.
+
+**Returns:** The builder instance
+
+```java
+embed.clearFields();
+```
+
+### getFields()
+
+Returns a modifiable list of the embed's fields.
+
+**Returns:** Mutable `List<MessageEmbed.Field>`
+
+```java
+List<MessageEmbed.Field> fields = embed.getFields();
+fields.remove(0); // Remove first field
+```
+
+### clear()
+
+Resets the builder to default state, removing all content.
+
+**Returns:** The builder instance
+
+```java
+embed.clear(); // Start fresh
+```
+
+### copyFrom(EmbedBuilder builder)
+
+Copies all data from another builder.
+
+**Parameters:**
+- `builder` - The builder to copy from
+
+```java
+embed.copyFrom(otherBuilder);
+```
+
+### copyFrom(MessageEmbed embed)
+
+Copies all data from an existing embed.
+
+**Parameters:**
+- `embed` - The embed to copy from
+
+```java
+embed.copyFrom(existingEmbed);
+```
+
+## Validation Methods
+
+### isEmpty()
+
+Checks if the embed is empty. Empty embeds cannot be built.
+
+**Returns:** `true` if empty
+
+```java
+if (embed.isEmpty()) {
+    System.out.println("Add some content!");
+}
+```
+
+### length()
+
+Returns the total character length of the embed.
+
+**Returns:** Total character count
+
+```java
+int totalLength = embed.length();
+```
+
+### isValidLength()
+
+Checks if the embed is within Discord's length limits (6000 characters for bots).
+
+**Returns:** `true` if within limits
+
+```java
+if (!embed.isValidLength()) {
+    System.out.println("Embed is too long!");
+}
+```
+
+### build()
+
+Builds and returns the final `MessageEmbed`. Validates all constraints.
+
+**Returns:** The completed `MessageEmbed`
+
+**Throws:**
+- `IllegalStateException` if embed is empty, too long, or has too many fields (max 25)
+
+```java
+MessageEmbed completed = embed.build();
+channel.sendMessageEmbeds(completed).queue();
+```
+
+## Constants
+
+### ZERO_WIDTH_SPACE
+
+A zero-width space character used for blank fields.
+
+```java
+String space = EmbedBuilder.ZERO_WIDTH_SPACE;
+```
+
+## Complete Example
+
+```java
+import net.dv8tion.jda.api.EmbedBuilder;
+import java.awt.Color;
+import java.time.Instant;
+
+public class EmbedExample {
+    public void sendWelcomeEmbed(MessageChannel channel, Member member) {
+        EmbedBuilder embed = new EmbedBuilder()
+            .setTitle("Welcome to the Server!", "https://discord.com")
+            .setDescription("We're glad to have you here.")
+            .setColor(Color.GREEN)
+            .setAuthor(member.getEffectiveName(), null, member.getAvatarUrl())
+            .setThumbnail(member.getGuild().getIconUrl())
+            .addField("Member Count", String.valueOf(member.getGuild().getMemberCount()), true)
+            .addField("Join Date", member.getTimeJoined().format(DateTimeFormatter.ISO_LOCAL_DATE), true)
+            .setFooter("Welcome!", member.getJDA().getSelfUser().getAvatarUrl())
+            .setTimestamp(Instant.now());
+        
+        channel.sendMessageEmbeds(embed.build()).queue();
+    }
+}
+```
+
+## Limits
+
+- **Title**: 256 characters
+- **Description**: 4096 characters
+- **Fields**: Maximum 25 fields
+- **Field Name**: 256 characters
+- **Field Value**: 1024 characters
+- **Footer**: 2048 characters
+- **Author**: 256 characters
+- **Total Length**: 6000 characters (for bots)
+- **URLs**: 2048 characters
+
+## See Also
+
+- [MessageEmbed](./message-embed)
+- [Message Sending](../messages/sending)
+- [Discord Embed Visualizer](https://leovoel.github.io/embed-visualizer/)

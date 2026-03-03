@@ -1,0 +1,613 @@
+---
+title: DefaultShardManagerBuilder
+description: Build and configure ShardManager instances for Discord bots
+---
+
+The `DefaultShardManagerBuilder` is used to create and configure `ShardManager` instances with various settings for sharded Discord bots.
+
+## Creating a Builder
+
+### createDefault
+
+Creates a builder with recommended default settings.
+
+```java
+static DefaultShardManagerBuilder createDefault(String token)
+static DefaultShardManagerBuilder createDefault(String token, GatewayIntent intent, GatewayIntent... intents)
+static DefaultShardManagerBuilder createDefault(String token, Collection<GatewayIntent> intents)
+```
+
+<ParamField path="token" type="String">
+  Your bot token
+</ParamField>
+<ParamField path="intents" type="Collection<GatewayIntent>">
+  Gateway intents to enable
+</ParamField>
+
+**Default settings:**
+- MemberCachePolicy: `DEFAULT`
+- ChunkingFilter: `NONE`
+- Intents: `GatewayIntent.DEFAULT`
+- Disables `ACTIVITY` and `CLIENT_STATUS` cache flags
+
+**Example:**
+
+```java
+ShardManager manager = DefaultShardManagerBuilder
+    .createDefault("YOUR_BOT_TOKEN")
+    .build();
+```
+
+### createLight
+
+Creates a builder with minimal memory usage settings.
+
+```java
+static DefaultShardManagerBuilder createLight(String token)
+static DefaultShardManagerBuilder createLight(String token, GatewayIntent intent, GatewayIntent... intents)
+static DefaultShardManagerBuilder createLight(String token, Collection<GatewayIntent> intents)
+```
+
+**Light profile settings:**
+- MemberCachePolicy: `NONE`
+- ChunkingFilter: `NONE`
+- Disables all cache flags
+- Large threshold: 50
+
+**Example:**
+
+```java
+ShardManager manager = DefaultShardManagerBuilder
+    .createLight("YOUR_BOT_TOKEN")
+    .enableIntents(GatewayIntent.GUILD_MESSAGES)
+    .build();
+```
+
+### create
+
+Creates a builder with no defaults, maximum customization.
+
+```java
+static DefaultShardManagerBuilder create(GatewayIntent intent, GatewayIntent... intents)
+static DefaultShardManagerBuilder create(Collection<GatewayIntent> intents)
+static DefaultShardManagerBuilder create(String token, GatewayIntent intent, GatewayIntent... intents)
+static DefaultShardManagerBuilder create(String token, Collection<GatewayIntent> intents)
+```
+
+<ParamField path="token" type="String">
+  Your bot token (can be set later with `setToken()`)
+</ParamField>
+<ParamField path="intents" type="Collection<GatewayIntent>" required>
+  Gateway intents to enable
+</ParamField>
+
+**Example:**
+
+```java
+ShardManager manager = DefaultShardManagerBuilder
+    .create("YOUR_BOT_TOKEN", GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT)
+    .setToken("YOUR_BOT_TOKEN")
+    .setMemberCachePolicy(MemberCachePolicy.ALL)
+    .build();
+```
+
+## Basic Configuration
+
+### setToken
+
+Sets the bot token.
+
+```java
+DefaultShardManagerBuilder setToken(String token)
+```
+
+<ParamField path="token" type="String" required>
+  Your Discord bot token
+</ParamField>
+
+### setShardsTotal
+
+Sets the total number of shards.
+
+```java
+DefaultShardManagerBuilder setShardsTotal(int shardsTotal)
+```
+
+<ParamField path="shardsTotal" type="int" required>
+  Total number of shards (Discord recommends this value)
+</ParamField>
+
+<Info>
+  Discord provides the recommended shard count in the `/gateway/bot` endpoint. JDA automatically fetches this if not specified.
+</Info>
+
+### setShards
+
+Sets specific shard IDs to run.
+
+```java
+DefaultShardManagerBuilder setShards(int... shardIds)
+DefaultShardManagerBuilder setShards(Collection<Integer> shardIds)
+```
+
+<ParamField path="shardIds" type="Collection<Integer>" required>
+  Specific shard IDs to start
+</ParamField>
+
+**Example:**
+
+```java
+// Run only shards 0, 1, and 2 out of 4 total
+DefaultShardManagerBuilder.createDefault(token)
+    .setShardsTotal(4)
+    .setShards(0, 1, 2)
+    .build();
+```
+
+## Gateway Intents
+
+### enableIntents
+
+Enables specific gateway intents.
+
+```java
+DefaultShardManagerBuilder enableIntents(GatewayIntent intent, GatewayIntent... intents)
+DefaultShardManagerBuilder enableIntents(Collection<GatewayIntent> intents)
+```
+
+<ParamField path="intents" type="Collection<GatewayIntent>" required>
+  Intents to enable
+</ParamField>
+
+### disableIntents
+
+Disables specific gateway intents.
+
+```java
+DefaultShardManagerBuilder disableIntents(GatewayIntent intent, GatewayIntent... intents)
+DefaultShardManagerBuilder disableIntents(Collection<GatewayIntent> intents)
+```
+
+**Example:**
+
+```java
+DefaultShardManagerBuilder.createDefault(token)
+    .enableIntents(GatewayIntent.MESSAGE_CONTENT)
+    .disableIntents(GatewayIntent.GUILD_PRESENCES)
+    .build();
+```
+
+### setEnabledIntents
+
+Sets the exact set of enabled intents.
+
+```java
+DefaultShardManagerBuilder setEnabledIntents(Collection<GatewayIntent> intents)
+```
+
+## Cache Configuration
+
+### enableCache
+
+Enables specific cache flags.
+
+```java
+DefaultShardManagerBuilder enableCache(CacheFlag flag, CacheFlag... flags)
+DefaultShardManagerBuilder enableCache(Collection<CacheFlag> flags)
+```
+
+<ParamField path="flags" type="Collection<CacheFlag>" required>
+  Cache flags to enable
+</ParamField>
+
+### disableCache
+
+Disables specific cache flags.
+
+```java
+DefaultShardManagerBuilder disableCache(CacheFlag flag, CacheFlag... flags)
+DefaultShardManagerBuilder disableCache(Collection<CacheFlag> flags)
+```
+
+**Example:**
+
+```java
+DefaultShardManagerBuilder.createDefault(token)
+    .enableCache(CacheFlag.VOICE_STATE)
+    .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+    .build();
+```
+
+### setMemberCachePolicy
+
+Configures member caching policy.
+
+```java
+DefaultShardManagerBuilder setMemberCachePolicy(MemberCachePolicy policy)
+```
+
+<ParamField path="policy" type="MemberCachePolicy">
+  The member caching policy (default: `ALL`)
+</ParamField>
+
+**Example:**
+
+```java
+// Only cache members in voice channels
+DefaultShardManagerBuilder.createDefault(token)
+    .setMemberCachePolicy(MemberCachePolicy.VOICE)
+    .build();
+
+// Cache members with specific roles
+MemberCachePolicy policy = (member) -> 
+    member.getRoles().stream()
+        .anyMatch(role -> role.getName().equals("Moderator"));
+
+DefaultShardManagerBuilder.createDefault(token)
+    .setMemberCachePolicy(policy)
+    .build();
+```
+
+### setChunkingFilter
+
+Configures guild member chunking.
+
+```java
+DefaultShardManagerBuilder setChunkingFilter(ChunkingFilter filter)
+```
+
+<ParamField path="filter" type="ChunkingFilter" required>
+  Determines which guilds to chunk members for
+</ParamField>
+
+**Example:**
+
+```java
+// Chunk all guilds
+DefaultShardManagerBuilder.createDefault(token)
+    .setChunkingFilter(ChunkingFilter.ALL)
+    .build();
+
+// Don't chunk any guilds
+DefaultShardManagerBuilder.createDefault(token)
+    .setChunkingFilter(ChunkingFilter.NONE)
+    .build();
+```
+
+## Event Listeners
+
+### addEventListeners
+
+Adds global event listeners to all shards.
+
+```java
+DefaultShardManagerBuilder addEventListeners(Object... listeners)
+DefaultShardManagerBuilder addEventListeners(Collection<Object> listeners)
+```
+
+<ParamField path="listeners" type="Object..." required>
+  Event listeners (must implement `EventListener`)
+</ParamField>
+
+**Example:**
+
+```java
+DefaultShardManagerBuilder.createDefault(token)
+    .addEventListeners(new MyEventListener())
+    .build();
+```
+
+### addEventListenerProvider
+
+Adds shard-specific event listeners via a provider.
+
+```java
+DefaultShardManagerBuilder addEventListenerProvider(IntFunction<Object> listenerProvider)
+DefaultShardManagerBuilder addEventListenerProviders(Collection<IntFunction<Object>> listenerProviders)
+```
+
+<ParamField path="listenerProvider" type="IntFunction<Object>" required>
+  Function that receives shard ID and returns a listener
+</ParamField>
+
+**Example:**
+
+```java
+DefaultShardManagerBuilder.createDefault(token)
+    .addEventListenerProvider(shardId -> new ShardListener(shardId))
+    .build();
+```
+
+### setEventManagerProvider
+
+Sets a custom event manager for each shard.
+
+```java
+DefaultShardManagerBuilder setEventManagerProvider(IntFunction<? extends IEventManager> eventManagerProvider)
+```
+
+**Example:**
+
+```java
+DefaultShardManagerBuilder.createDefault(token)
+    .setEventManagerProvider(shardId -> new AnnotatedEventManager())
+    .build();
+```
+
+## Presence Configuration
+
+### setActivity
+
+Sets the activity for all shards.
+
+```java
+DefaultShardManagerBuilder setActivity(Activity activity)
+```
+
+<ParamField path="activity" type="Activity">
+  The activity to display
+</ParamField>
+
+**Example:**
+
+```java
+DefaultShardManagerBuilder.createDefault(token)
+    .setActivity(Activity.playing("with shards"))
+    .build();
+```
+
+### setActivityProvider
+
+Sets shard-specific activities.
+
+```java
+DefaultShardManagerBuilder setActivityProvider(IntFunction<? extends Activity> activityProvider)
+```
+
+**Example:**
+
+```java
+DefaultShardManagerBuilder.createDefault(token)
+    .setActivityProvider(shardId -> 
+        Activity.playing("Shard " + shardId)
+    )
+    .build();
+```
+
+### setStatus
+
+Sets the online status for all shards.
+
+```java
+DefaultShardManagerBuilder setStatus(OnlineStatus status)
+```
+
+### setStatusProvider
+
+Sets shard-specific online statuses.
+
+```java
+DefaultShardManagerBuilder setStatusProvider(IntFunction<OnlineStatus> statusProvider)
+```
+
+### setIdle
+
+Sets the idle state for all shards.
+
+```java
+DefaultShardManagerBuilder setIdle(boolean idle)
+```
+
+## Advanced Configuration
+
+### setSessionController
+
+Sets a custom session controller for managing shard connections.
+
+```java
+DefaultShardManagerBuilder setSessionController(SessionController controller)
+```
+
+<ParamField path="controller" type="SessionController">
+  Session controller for coordinating shard connections
+</ParamField>
+
+### setVoiceDispatchInterceptor
+
+Sets a custom voice dispatch handler.
+
+```java
+DefaultShardManagerBuilder setVoiceDispatchInterceptor(VoiceDispatchInterceptor interceptor)
+```
+
+<ParamField path="interceptor" type="VoiceDispatchInterceptor">
+  Custom voice dispatch interceptor
+</ParamField>
+
+### setAudioModuleConfig
+
+Configures the audio module.
+
+```java
+DefaultShardManagerBuilder setAudioModuleConfig(AudioModuleConfig config)
+```
+
+<ParamField path="config" type="AudioModuleConfig">
+  Audio module configuration
+</ParamField>
+
+### setCompression
+
+Sets the gateway compression algorithm.
+
+```java
+DefaultShardManagerBuilder setCompression(Compression compression)
+```
+
+<ParamField path="compression" type="Compression" required>
+  Compression type (default: `ZLIB`)
+</ParamField>
+
+### setGatewayEncoding
+
+Sets the gateway encoding format.
+
+```java
+DefaultShardManagerBuilder setGatewayEncoding(GatewayEncoding encoding)
+```
+
+<ParamField path="encoding" type="GatewayEncoding" required>
+  Encoding format (default: `JSON`)
+</ParamField>
+
+## Behavioral Flags
+
+### setAutoReconnect
+
+Enables/disables automatic reconnection.
+
+```java
+DefaultShardManagerBuilder setAutoReconnect(boolean autoReconnect)
+```
+
+<ParamField path="autoReconnect" type="boolean" required>
+  `true` to enable auto-reconnect (default)
+</ParamField>
+
+### setBulkDeleteSplittingEnabled
+
+Enables/disables splitting bulk delete events.
+
+```java
+DefaultShardManagerBuilder setBulkDeleteSplittingEnabled(boolean enabled)
+```
+
+<ParamField path="enabled" type="boolean" required>
+  `true` to split bulk deletes into individual events (default)
+</ParamField>
+
+### setEnableShutdownHook
+
+Enables/disables the JVM shutdown hook.
+
+```java
+DefaultShardManagerBuilder setEnableShutdownHook(boolean enable)
+```
+
+<ParamField path="enable" type="boolean" required>
+  `true` to enable shutdown hook (default)
+</ParamField>
+
+### setRawEventsEnabled
+
+Enables raw gateway events.
+
+```java
+DefaultShardManagerBuilder setRawEventsEnabled(boolean enable)
+```
+
+<ParamField path="enable" type="boolean" required>
+  `true` to fire `RawGatewayEvent` for all events
+</ParamField>
+
+### setEventPassthrough
+
+Enables raw data passthrough on events.
+
+```java
+DefaultShardManagerBuilder setEventPassthrough(boolean enable)
+```
+
+<ParamField path="enable" type="boolean" required>
+  `true` to include raw `DataObject` in events
+</ParamField>
+
+## Thread Pool Configuration
+
+### setCallbackPoolProvider
+
+Sets the thread pool for RestAction callbacks.
+
+```java
+DefaultShardManagerBuilder setCallbackPoolProvider(ThreadPoolProvider<? extends ExecutorService> provider)
+```
+
+### setGatewayPoolProvider
+
+Sets the thread pool for gateway operations.
+
+```java
+DefaultShardManagerBuilder setGatewayPoolProvider(ThreadPoolProvider<? extends ScheduledExecutorService> provider)
+```
+
+### setRateLimitSchedulerProvider
+
+Sets the thread pool for rate limit scheduling.
+
+```java
+DefaultShardManagerBuilder setRateLimitSchedulerProvider(ThreadPoolProvider<? extends ScheduledExecutorService> provider)
+```
+
+## Building
+
+### build
+
+Builds and starts the ShardManager.
+
+```java
+ShardManager build() throws LoginException, InvalidTokenException
+```
+
+<ResponseField name="returns" type="ShardManager">
+  The configured ShardManager instance
+</ResponseField>
+
+**Example:**
+
+```java
+ShardManager manager = DefaultShardManagerBuilder
+    .createDefault("YOUR_BOT_TOKEN")
+    .setActivity(Activity.watching("the shards"))
+    .addEventListeners(new MyListener())
+    .build();
+```
+
+## Complete Example
+
+```java
+public class ShardedBot {
+    public static void main(String[] args) throws Exception {
+        ShardManager shardManager = DefaultShardManagerBuilder
+            .createDefault(
+                "YOUR_BOT_TOKEN",
+                GatewayIntent.GUILDS,
+                GatewayIntent.GUILD_MESSAGES,
+                GatewayIntent.MESSAGE_CONTENT
+            )
+            // Cache configuration
+            .setMemberCachePolicy(MemberCachePolicy.VOICE)
+            .enableCache(CacheFlag.VOICE_STATE)
+            .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS)
+            
+            // Event listeners
+            .addEventListeners(new GlobalListener())
+            .addEventListenerProvider(shardId -> new ShardListener(shardId))
+            
+            // Presence
+            .setActivityProvider(shardId ->
+                Activity.playing("Shard " + shardId)
+            )
+            .setStatus(OnlineStatus.ONLINE)
+            
+            // Advanced configuration
+            .setAutoReconnect(true)
+            .setCompression(Compression.ZLIB)
+            .setBulkDeleteSplittingEnabled(false)
+            
+            .build();
+        
+        System.out.println("ShardManager started with " + 
+                          shardManager.getShardsTotal() + " shards");
+    }
+}
+```
