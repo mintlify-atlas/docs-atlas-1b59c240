@@ -1,0 +1,181 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "JDA (Java Discord API)",
+  "projectDescription": "Java wrapper library for building Discord bots using the Discord API",
+  "theme": "aspen",
+  "primaryColor": "#5865F2",
+  "lightColor": "#7289DA",
+  "darkColor": "#4752C4",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/jda-builder",
+              "core-concepts/gateway-intents",
+              "core-concepts/rest-action",
+              "core-concepts/event-system",
+              "core-concepts/caching"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-a-bot",
+              "guides/message-logging",
+              "guides/slash-commands",
+              "guides/interactions",
+              "guides/audio-connections",
+              "guides/sharding",
+              "guides/error-handling"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "advanced/rate-limiting",
+              "advanced/member-cache-policy",
+              "advanced/custom-event-managers",
+              "advanced/threading-configuration"
+            ]
+          },
+          {
+            "group": "Migration & Troubleshooting",
+            "pages": [
+              "migration/breaking-changes",
+              "troubleshooting/common-issues",
+              "troubleshooting/faq"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/jda",
+              "api/jda-builder",
+              "api/rest-action"
+            ]
+          },
+          {
+            "group": "Entities",
+            "pages": [
+              "api/entities/guild",
+              "api/entities/member",
+              "api/entities/user",
+              "api/entities/message",
+              "api/entities/channel",
+              "api/entities/role"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api/events/overview",
+              "api/events/message-events",
+              "api/events/guild-events",
+              "api/events/interaction-events"
+            ]
+          },
+          {
+            "group": "Interactions",
+            "pages": [
+              "api/interactions/slash-commands",
+              "api/interactions/buttons",
+              "api/interactions/select-menus",
+              "api/interactions/modals"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/utilities/embed-builder",
+              "api/utilities/permission",
+              "api/utilities/gateway-intent"
+            ]
+          },
+          {
+            "group": "Audio",
+            "pages": [
+              "api/audio/audio-manager",
+              "api/audio/audio-send-handler",
+              "api/audio/audio-receive-handler"
+            ]
+          },
+          {
+            "group": "Sharding",
+            "pages": [
+              "api/sharding/shard-manager",
+              "api/sharding/default-shard-manager-builder"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Basic Examples",
+            "pages": [
+              "examples/hello-world",
+              "examples/message-logger",
+              "examples/slash-bot"
+            ]
+          },
+          {
+            "group": "Advanced Examples",
+            "pages": [
+              "examples/components",
+              "examples/audio-echo",
+              "examples/localization"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Event-driven architecture for Discord bot development",
+    "RestAction-based async API with callbacks and futures",
+    "Gateway intents and customizable member caching",
+    "Full support for slash commands and interactions",
+    "Audio connections with DAVE protocol support",
+    "Sharding support for scaling to large bot deployments",
+    "Comprehensive entity models for Discord resources",
+    "Rate limit handling and REST API management"
+  ],
+  "publicApiSurface": [
+    "JDA - Main API interface",
+    "JDABuilder - Builder for creating JDA instances",
+    "DefaultShardManagerBuilder - Builder for sharded bots",
+    "RestAction<T> - Async request builder",
+    "ListenerAdapter - Event listener base class",
+    "GatewayIntent - Gateway event subscriptions",
+    "Guild - Server entity",
+    "Member - Guild member entity",
+    "User - User entity",
+    "Message - Message entity",
+    "MessageChannel - Text channel interface",
+    "EmbedBuilder - Rich embed builder",
+    "SlashCommandInteractionEvent - Slash command event",
+    "InteractionHook - Interaction response handler",
+    "AudioManager - Voice connection manager",
+    "Permission - Permission flags",
+    "CacheFlag - Cache configuration flags",
+    "MemberCachePolicy - Member caching strategies"
+  ]
+}
